@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>исследование фишинговых атак в электронных письмах</title>
+  <link rel="stylesheet" type="text/css" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <h1>SecureMail — исследование противодействия фишингу</h1>
+      <p class="subtitle">Дипломный прототип — демонстрация антифишинговых механик</p>
+    </div>
+  </header>
+
+  <nav class="top-nav container" aria-label="Главное меню">
+    <button onclick="renderInbox()" id="btn-inbox">📥 Входящие</button>
+    <button onclick="showCompose()" id="btn-compose">✉️ Новое письмо</button>
+    <button onclick="showSettings()" id="btn-settings">⚙️ Настройки</button>
+    <input id="search" placeholder="Поиск по письмам..." oninput="renderInbox()" />
+  </nav>
+
+  <main class="container" id="content">
+    <!-- Содержимое генерируется скриптом -->
+  </main>
+
+  <!-- Модальное предупреждение для подозрительных ссылок -->
+  <div id="linkWarning" class="modal" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="modal-inner">
+      <h3>⚠️ Предупреждение о ссылке</h3>
+      <p id="linkWarningText"></p>
+      <div class="modal-actions">
+        <button onclick="closeWarning()">Отмена</button>
+        <a id="continueLink" href="#" target="_blank" rel="noreferrer noopener"><button class="danger">Перейти всё равно</button></a>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer container">
+    <small>© 2025 Дипломная работа Рымтай Анель. Все действия — в демонстрационных целях.</small>
+  </footer>
+
+  <script>
+    /* ---------- Demo data ---------- */
+    const emails = [
+      {
+        id: 1,
+        from: 'no-reply@yourbank.com',
+        subject: 'Ваш счёт требует подтверждения',
+        date: '2025-10-24',
+        body: 'Уважаемый клиент, подтвердите платёжные данные: <a href="https://secure-yourbank.login.verify.example.com/confirm">https://secure-yourbank.login.verify.example.com/confirm</a>'
+      },
+      {
+        id: 2,
+        from: 'friend.best@gmail.com',
+        subject: 'Посмотри это фото',
+        date: '2025-10-22',
+        body: 'Привет! Вот ссылка: <a href="http://93.184.216.34/album.jpg">http://93.184.216.34/album.jpg</a>'
+      },
+      {
+        id: 3,
+        from: 'it-support@company.example.com',
+        subject: 'Password reset required',
+        date: '2025-10-20',
+        body: 'Password reset requested. Click: <a href="https://attacker.example.com/reset">https://attacker.example.com/reset</a>'
+      },
+      {
+        id: 4,
+        from: 'news@newsletter.example.com',
+        subject: 'Еженедельная рассылка',
+        date: '2025-10-19',
+        body: 'Добро пожаловать в нашу рассылку! Новинки внутри.'
+      }
+    ];
+
+    let currentEmailId = null;
+
+    /* ---------- Heuristic detection ---------- */
+    function detectPhishing(text = '', from = '') {
+      const reasons = [];
+      let score = 0;
+      const lower = String(text).toLowerCase();
+
+      const urgentWords = ['urgent','срочно','verify','password','login','подтвердите','восстановление','action required'];
+      for (const w of urgentWords) if (lower.includes(w)) { score += 15; reasons.push('Срочный/безопасностный тон'); }
+
+      const linkRegex = /https?:\/\/[^\s'"]+/ig;
+      const links = (text.match(linkRegex) || []);
+      for (const l of links) {
+        try {
+          const url = new URL(l);
+          if (/^\d+\.\d+\.\d+\.\d+$/.test(url.hostname)) { score += 25; reasons.push('Ссылка указывает на IP-адрес'); }
+          const senderDomain = (from || '').split('@')[1] || '';
+          if (senderDomain && !url.hostname.includes(senderDomain) && !url.hostname.endsWith('google.com')) {
+            score += 20; reasons.push('Домен ссылки не совпадает с доменом отправителя');
+          }
+        } catch (e) {
+          // игнорируем
+          score += 10;
+          reasons.push('Некорректный URL в теле письма');
+        }
+      }
+
+      if (score > 100) score = 100;
+      return { score, reasons: Array.from(new Set(reasons)), links };
+    }
+
+    /* ---------- Render functions ---------- */
+    function renderInbox() {
+      const q = (document.getElementById('search').value || '').toLowerCase();
+      const list = emails
+        .filter(e => (e.from + ' ' + e.subject + ' ' + e.body).toLowerCase().includes(q))
+        .map(e => {
+          const det = detectPhishing(e.body, e.from);
+          const riskClass = det.score > 50 ? 'risk-high' : (det.score > 20 ? 'risk-medium' : 'risk-low');
+          return `
+            <article class="email-item ${riskClass}" onclick="openEmail(${e.id})" aria-labelledby="sub-${e.id}">
+              <div class="email-meta">
+                <div class="avatar">${(e.from && e.from[0]) ? e.from[0].toUpperCase() : '?'}</div>
+                <div>
+                  <div id="sub-${e.id}" class="email-subject">${escapeHtml(e.subject)}</div>
+                  <div class="email-from">${escapeHtml(e.from)} • ${escapeHtml(e.date)}</div>
+                </div>
+              </div>
+              <div class="email-risk">Risk: ${det.score}%</div>
+            </article>
+          `;
+        }).join('');
+      document.getElementById('content').innerHTML = `<h2>Входящие</h2><div class="inbox-list">${list || '<p>Пусто</p>'}</div>`;
+    }
+
+    function openEmail(id) {
+      currentEmailId = id;
+      const mail = emails.find(x => x.id === id);
+      if (!mail) { document.getElementById('content').innerHTML = '<p>Письмо не найдено</p>'; return; }
+      const det = detectPhishing(mail.body, mail.from);
+      document.getElementById('content').innerHTML = `
+        <article class="mail-view">
+          <header>
+            <h2>${escapeHtml(mail.subject)}</h2>
+            <div class="mail-from"><strong>От:</strong> ${escapeHtml(mail.from)} <span class="dot">•</span> ${escapeHtml(mail.date)}</div>
+          </header>
+          <section class="mail-body">${mail.body}</section>
+          <footer class="mail-actions">
+            <div class="detected ${det.score > 50 ? 'danger' : (det.score > 20 ? 'warn' : 'ok')}">
+              <strong>Phishing score:</strong> ${det.score}% ${det.reasons.length ? ' — ' + det.reasons.join('; ') : ''}
+            </div>
+            <div class="buttons">
+              <button onclick="renderInbox()">Назад</button>
+              <button onclick="markPhishing(${id})" class="danger">Report phishing</button>
+            </div>
+          </footer>
+        </article>
+      `;
+      attachLinkHandlers();
+    }
+
+    function showCompose() {
+      document.getElementById('content').innerHTML = `
+        <h2>Новое письмо</h2>
+        <form id="composeForm" onsubmit="sendCompose(event)">
+          <label>Кому</label><input type="email" id="composeTo" required placeholder="example@domain.com">
+          <label>Тема</label><input id="composeSubject" required>
+          <label>Сообщение</label><textarea id="composeBody" rows="8" placeholder="Текст письма..."></textarea>
+          <div class="compose-actions">
+            <button type="submit">Отправить (демо)</button>
+            <button type="button" onclick="renderInbox()">Отмена</button>
+          </div>
+        </form>
+      `;
+    }
+
+    function showSettings() {
+      document.getElementById('content').innerHTML = `
+        <h2>Настройки безопасности</h2>
+        <div class="settings">
+          <label><input type="checkbox" id="optAutoDetect" checked> Включить автоматическую проверку ссылок</label>
+          <p class="small">В реальной системе здесь подключаются SPF/DKIM/DMARC, URL sandboxes и ML-классификаторы.</p>
+        </div>
+      `;
+    }
+
+    /* ---------- Helpers & link handling ---------- */
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function attachLinkHandlers() {
+      const mailBody = document.querySelector('.mail-body');
+      if (!mailBody) return;
+      const links = mailBody.querySelectorAll('a[href]');
+      links.forEach(a => {
+        a.setAttribute('data-href', a.href);
+        try {
+          const url = new URL(a.href);
+          a.setAttribute('title', 'Домен: ' + url.hostname);
+        } catch(e) { a.setAttribute('title', a.href); }
+
+        a.addEventListener('click', function(ev) {
+          ev.preventDefault();
+          const href = this.getAttribute('data-href');
+          const mail = emails.find(x => x.id === currentEmailId) || {};
+          const det = detectPhishing(mail.body, mail.from);
+          let linkSuspicious = false;
+          try {
+            const url = new URL(href);
+            const senderDomain = (mail.from || '').split('@')[1] || '';
+            if (/^\d+\.\d+\.\d+\.\d+$/.test(url.hostname)) linkSuspicious = true;
+            if (senderDomain && !url.hostname.includes(senderDomain)) linkSuspicious = true;
+          } catch (e) { linkSuspicious = true; }
+
+          if (det.score > 30 || linkSuspicious) {
+            const text = linkSuspicious ? 'Ссылка кажется подозрительной (домен не совпадает или это IP).' : 'Письмо имеет высокий phishing score.';
+            document.getElementById('linkWarningText').innerText = text + '\\nСсылка: ' + href;
+            document.getElementById('continueLink').setAttribute('href', href);
+            document.getElementById('linkWarning').style.display = 'flex';
+            document.getElementById('linkWarning').setAttribute('aria-hidden', 'false');
+          } else {
+            window.open(href, '_blank', 'noopener');
+          }
+        });
+      });
+    }
+
+    function closeWarning() {
+      document.getElementById('linkWarning').style.display = 'none';
+      document.getElementById('linkWarning').setAttribute('aria-hidden', 'true');
+    }
+
+    function markPhishing(id) {
+      alert('Письмо отмечено как фишинг (демо). В дипломной работе: отправка в SOC/логирование).');
+      renderInbox();
+    }
+
+    function sendCompose(ev) {
+      ev.preventDefault();
+      const to = document.getElementById('composeTo').value;
+      const subj = document.getElementById('composeSubject').value;
+      const body = document.getElementById('composeBody').value;
+      const id = emails.length ? Math.max(...emails.map(e=>e.id)) + 1 : 1;
+      emails.unshift({ id, from: to, subject: subj, date: new Date().toISOString().slice(0,10), body: escapeHtml(body).replace(/\n/g,'<br>') });
+      alert('Письмо отправлено (демо) — добавлено в список входящих как от: ' + to);
+      renderInbox();
+    }
+
+    /* ---------- Init ---------- */
+    document.addEventListener('DOMContentLoaded', () => {
+      renderInbox();
+    });
+  </script>
+</body>
+</html>
+
