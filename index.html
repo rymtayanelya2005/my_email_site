@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>исследование фишинговых атак в электронных письмах</title>
-  <link rel="stylesheet" type="text/css" href="style.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
   <header class="site-header">
@@ -164,7 +164,7 @@
           <label>Тема</label><input id="composeSubject" required>
           <label>Сообщение</label><textarea id="composeBody" rows="8" placeholder="Текст письма..."></textarea>
           <div class="compose-actions">
-            <button type="submit">Отправить (демо)</button>
+            <button type="submit">Отправить </button>
             <button type="button" onclick="renderInbox()">Отмена</button>
           </div>
         </form>
@@ -235,20 +235,38 @@
     }
 
     function markPhishing(id) {
-      alert('Письмо отмечено как фишинг (демо). В дипломной работе: отправка в SOC/логирование).');
+      alert('Письмо отмечено как фишинг. В дипломной работе: отправка в SOC/логирование).');
       renderInbox();
     }
 
-    function sendCompose(ev) {
-      ev.preventDefault();
-      const to = document.getElementById('composeTo').value;
-      const subj = document.getElementById('composeSubject').value;
-      const body = document.getElementById('composeBody').value;
-      const id = emails.length ? Math.max(...emails.map(e=>e.id)) + 1 : 1;
-      emails.unshift({ id, from: to, subject: subj, date: new Date().toISOString().slice(0,10), body: escapeHtml(body).replace(/\n/g,'<br>') });
-      alert('Письмо отправлено (демо) — добавлено в список входящих как от: ' + to);
-      renderInbox();
+    
+function sendCompose(ev) {
+  ev.preventDefault();
+  const to = document.getElementById('composeTo').value;
+  const subj = document.getElementById('composeSubject').value;
+  const body = document.getElementById('composeBody').value;
+
+  fetch('/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      to: to,
+      subject: subj,
+      message: body
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.status === 'success') {
+      alert('✅ ' + data.message);
+    } else {
+      alert('❌ Ошибка: ' + data.message);
     }
+  })
+  .catch(err => alert('⚠️ Ошибка при подключении к серверу: ' + err));
+}
+
+
 
     /* ---------- Init ---------- */
     document.addEventListener('DOMContentLoaded', () => {
