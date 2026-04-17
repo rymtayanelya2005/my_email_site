@@ -3,276 +3,1338 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>исследование фишинговых атак в электронных письмах</title>
+  <title></title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    body { margin: 0; display: flex; flex-direction: column; min-height: 100vh; }
+    .site-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 16px 28px;
+      background: linear-gradient(135deg, #1a1a2e 0%, #0f4c75 100%);
+      color: white; box-shadow: 0 4px 20px rgba(26,26,46,0.4);
+      position: sticky; top: 0; z-index: 100;
+    }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    .header-logo { width:40px;height:40px;background:rgba(255,255,255,0.15);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px; }
+    .header-title { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+    .header-subtitle { font-size: 12px; opacity: 0.7; margin-top: 2px; }
+    .header-right { display: flex; align-items: center; gap: 14px; }
+    .user-badge { display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.12);padding:8px 14px;border-radius:20px;font-size:13px; }
+    .user-badge .role-tag { background:#d4af37;color:#1a1a2e;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;text-transform:uppercase; }
+    .user-badge .role-tag.user { background:#3282b8;color:white; }
+    .monitoring-status-header { display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.1);padding:8px 14px;border-radius:20px;font-size:12px; }
+    .status-dot { width:8px;height:8px;border-radius:50%;background:#6c757d;animation:pulse 2s infinite; }
+    .status-dot.active { background:#28a745;box-shadow:0 0 0 3px rgba(40,167,69,0.3); }
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+    .btn-logout { background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.3);padding:8px 16px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px;transition:all 0.2s; }
+    .btn-logout:hover { background:rgba(255,255,255,0.25); }
+    .app-layout { display:flex;flex:1;min-height:calc(100vh - 73px); }
+    .sidebar { width:220px;min-width:220px;background:#1a1a2e;padding:20px 0;display:flex;flex-direction:column;position:sticky;top:73px;height:calc(100vh - 73px);overflow-y:auto; }
+    .sidebar-section-label { font-size:10px;font-weight:700;letter-spacing:0.1em;color:rgba(255,255,255,0.35);text-transform:uppercase;padding:0 20px;margin:18px 0 8px; }
+    .sidebar-btn { display:flex;align-items:center;gap:12px;padding:12px 20px;color:rgba(255,255,255,0.65);cursor:pointer;transition:all 0.2s;border:none;background:none;width:100%;text-align:left;font-size:14px;font-weight:500;border-left:3px solid transparent; }
+    .sidebar-btn:hover { color:white;background:rgba(255,255,255,0.06); }
+    .sidebar-btn.active { color:white;background:rgba(50,130,184,0.2);border-left-color:#3282b8; }
+    .sidebar-btn .icon { font-size:16px;width:20px;text-align:center; }
+    .sidebar-btn.admin-only { display:none; }
+    body.is-admin .sidebar-btn.admin-only { display:flex; }
+    .main-content { flex:1;padding:28px;overflow-y:auto;background:#eaeaea; }
+    .users-panel table { width:100%;border-collapse:collapse;background:white;border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.07); }
+    .users-panel th { background:#1a1a2e;color:white;padding:14px 18px;text-align:left;font-size:13px;font-weight:600; }
+    .users-panel td { padding:12px 18px;border-bottom:1px solid #f0f0f0;font-size:14px; }
+    .users-panel tr:last-child td { border-bottom:none; }
+    .users-panel tr:hover td { background:#f8f9fa; }
+    .role-badge { padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;text-transform:uppercase; }
+    .role-badge.admin { background:#fff3cd;color:#856404;border:1px solid #ffc107; }
+    .role-badge.user { background:#d1ecf1;color:#0c5460;border:1px solid #bee5eb; }
+    .site-footer { background:#1a1a2e;color:rgba(255,255,255,0.4);text-align:center;padding:14px;font-size:12px; }
+
+    /* OSINT карточки */
+    .osint-card { background:white;border-radius:14px;padding:20px;border:2px solid #dee2e6;margin-bottom:16px; }
+    .osint-card h4 { margin:0 0 14px;font-size:14px;color:#666;text-transform:uppercase;letter-spacing:0.05em; }
+    .osint-row { display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f0; }
+    .osint-row:last-child { border-bottom:none; }
+    .osint-label { font-size:13px;color:#666;font-weight:500; }
+    .osint-value { font-size:14px;font-weight:600;color:#1a1a2e;text-align:right;max-width:60%; }
+    .osint-value.danger { color:#dc3545; }
+    .osint-value.success { color:#28a745; }
+    .osint-value.warning { color:#ffc107; }
+    .osint-grid { display:grid;grid-template-columns:1fr 1fr;gap:16px; }
+    .risk-meter { height:8px;border-radius:4px;background:#e9ecef;overflow:hidden;margin-top:8px; }
+    .risk-meter-fill { height:100%;border-radius:4px;transition:width 0.8s ease; }
+    .blacklist-item { display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:600;margin:3px; }
+    .blacklist-item.clean { background:#d4edda;color:#155724; }
+    .blacklist-item.listed { background:#f8d7da;color:#721c24; }
+    .device-icon { font-size:32px;text-align:center;margin-bottom:8px; }
+
+    @media(max-width:768px){
+      .sidebar{width:60px;min-width:60px;}
+      .sidebar-btn span:not(.icon){display:none;}
+      .sidebar-section-label{display:none;}
+      .main-content{padding:16px;}
+      .osint-grid{grid-template-columns:1fr;}
+    }
+  </style>
 </head>
 <body>
-  <header class="site-header">
-    <div class="container">
-      <h1>SecureMail — исследование противодействия фишингу</h1>
-      <p class="subtitle">Дипломный прототип — демонстрация антифишинговых механик</p>
-    </div>
-  </header>
 
-  <nav class="top-nav container" aria-label="Главное меню">
-    <button onclick="renderInbox()" id="btn-inbox">📥 Входящие</button>
-    <button onclick="showCompose()" id="btn-compose">✉️ Новое письмо</button>
-    <button onclick="showSettings()" id="btn-settings">⚙️ Настройки</button>
-    <input id="search" placeholder="Поиск по письмам..." oninput="renderInbox()" />
-  </nav>
-
-  <main class="container" id="content">
-    <!-- Содержимое генерируется скриптом -->
-  </main>
-
-  <!-- Модальное предупреждение для подозрительных ссылок -->
-  <div id="linkWarning" class="modal" aria-hidden="true" role="dialog" aria-modal="true">
-    <div class="modal-inner">
-      <h3>⚠️ Предупреждение о ссылке</h3>
-      <p id="linkWarningText"></p>
-      <div class="modal-actions">
-        <button onclick="closeWarning()">Отмена</button>
-        <a id="continueLink" href="#" target="_blank" rel="noreferrer noopener"><button class="danger">Перейти всё равно</button></a>
-      </div>
+<header class="site-header">
+  <div class="header-left">
+    <div class="header-logo"></div>
+    <div>
+      <div class="header-title"></div>
+      <div class="header-subtitle"></div>
     </div>
   </div>
+  <div class="header-right">
+    <div class="monitoring-status-header">
+      <span class="status-dot" id="status-dot"></span>
+      <span id="status-text">Загрузка...</span>
+    </div>
+    <div class="user-badge">
+      <span id="user-name">...</span>
+      <span class="role-tag user" id="role-tag">user</span>
+    </div>
+    <button class="btn-logout" onclick="handleLogout()">Выйти</button>
+  </div>
+</header>
 
-  <footer class="site-footer container">
-    <small>© 2025 Дипломная работа Рымтай Анель. Все действия — в демонстрационных целях.</small>
-  </footer>
+<div class="app-layout">
+  <nav class="sidebar">
+    <div class="sidebar-section-label">Мониторинг</div>
+    <button class="sidebar-btn active" id="btn-monitoring" onclick="navigate('monitoring')">
+      <span class="icon"></span><span>Мониторинг</span>
+    </button>
+    <button class="sidebar-btn" id="btn-gmail" onclick="navigate('gmail')">
+      <span class="icon"></span><span>Gmail</span>
+    </button>
 
-  <script>
-    /* ---------- Demo data ---------- */
-    const emails = [
-      {
-        id: 1,
-        from: 'no-reply@yourbank.com',
-        subject: 'Ваш счёт требует подтверждения',
-        date: '2025-10-24',
-        body: 'Уважаемый клиент, подтвердите платёжные данные: <a href="https://secure-yourbank.login.verify.example.com/confirm">https://secure-yourbank.login.verify.example.com/confirm</a>'
-      },
-      {
-        id: 2,
-        from: 'friend.best@gmail.com',
-        subject: 'Посмотри это фото',
-        date: '2025-10-22',
-        body: 'Привет! Вот ссылка: <a href="http://93.184.216.34/album.jpg">http://93.184.216.34/album.jpg</a>'
-      },
-      {
-        id: 3,
-        from: 'it-support@company.example.com',
-        subject: 'Password reset required',
-        date: '2025-10-20',
-        body: 'Password reset requested. Click: <a href="https://attacker.example.com/reset">https://attacker.example.com/reset</a>'
-      },
-      {
-        id: 4,
-        from: 'news@newsletter.example.com',
-        subject: 'Еженедельная рассылка',
-        date: '2025-10-19',
-        body: 'Добро пожаловать в нашу рассылку! Новинки внутри.'
+    <div class="sidebar-section-label">Анализ</div>
+    <button class="sidebar-btn" id="btn-manual" onclick="navigate('manual')">
+      <span class="icon"></span><span>Анализ EML</span>
+    </button>
+    <button class="sidebar-btn" id="btn-url" onclick="navigate('url')">
+      <span class="icon"></span><span>Проверка URL</span>
+    </button>
+    <button class="sidebar-btn" id="btn-dns" onclick="navigate('dns')">
+      <span class="icon"></span><span>Проверка DNS</span>
+    </button>
+
+    <div class="sidebar-section-label">Разведка</div>
+    <button class="sidebar-btn" id="btn-osint" onclick="navigate('osint')">
+      <span class="icon"></span><span>OSINT</span>
+    </button>
+
+    <div class="sidebar-section-label">Инструменты</div>
+    <button class="sidebar-btn" id="btn-send" onclick="navigate('send')">
+      <span class="icon"></span><span>Отправка</span>
+    </button>
+
+    <div class="sidebar-section-label admin-only">Администрация</div>
+    <button class="sidebar-btn admin-only" id="btn-users" onclick="navigate('users')">
+      <span class="icon"></span><span>Пользователи</span>
+    </button>
+  </nav>
+
+  <main class="main-content" id="content">
+    <p style="text-align:center;padding:40px;">Загрузка...</p>
+  </main>
+</div>
+
+<footer class="site-footer">
+  <small>© 2025 Дипломная работа Рымтай Анель</small>
+</footer>
+
+<script>
+  let monitoringActive = false;
+  let emailsData = [];
+  let refreshInterval = null;
+  let gmailRefreshInterval = null;
+  let currentUser = null;
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function formatDate(d) { try { return new Date(d).toLocaleString('ru-RU'); } catch { return d||''; } }
+  function isAdmin() { return currentUser && currentUser.role === 'admin'; }
+
+  function navigate(section) {
+    document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active'));
+    const btn = document.getElementById('btn-' + section);
+    if (btn) btn.classList.add('active');
+    stopAutoRefresh();
+    switch(section) {
+      case 'monitoring': showMonitoring(); break;
+      case 'gmail':      showGmailMonitoring(); break;
+      case 'manual':     showManualAnalysis(); break;
+      case 'url':        showURLCheck(); break;
+      case 'dns':        showDNSCheck(); break;
+      case 'osint':      showOSINT(); break;
+      case 'send':       showSendEmail(); break;
+      case 'users':      if(isAdmin()) showUsersPanel(); break;
+    }
+  }
+
+  // ========== Загрузка пользователя ==========
+  async function loadCurrentUser() {
+    try {
+      const res = await fetch('/api/auth/me');
+      if (res.status === 401) { window.location.href = '/login'; return; }
+      const data = await res.json();
+      if (data.success) {
+        currentUser = data.user;
+        document.getElementById('user-name').textContent = currentUser.name;
+        const rt = document.getElementById('role-tag');
+        rt.textContent = currentUser.role === 'admin' ? 'Админ' : 'Пользователь';
+        rt.className = 'role-tag ' + currentUser.role;
+        if (currentUser.role === 'admin') document.body.classList.add('is-admin');
       }
-    ];
+    } catch(e) { console.error(e); }
+  }
 
-    let currentEmailId = null;
+  // ========== Статус мониторинга ==========
+  async function updateMonitoringStatus() {
+    try {
+      const res = await fetch('/api/monitoring/status');
+      const data = await res.json();
+      monitoringActive = data.active;
+      const dot = document.getElementById('status-dot');
+      const txt = document.getElementById('status-text');
+      if (data.active) { dot.className='status-dot active'; txt.textContent='Мониторинг активен'; }
+      else { dot.className='status-dot'; txt.textContent='Мониторинг остановлен'; }
+    } catch {}
+  }
+  async function toggleMonitoring() {
+    try {
+      const res = await fetch(monitoringActive?'/api/monitoring/stop':'/api/monitoring/start', {method:'POST'});
+      const data = await res.json();
+      if (data.success) { await updateMonitoringStatus(); monitoringActive?startAutoRefresh():stopAutoRefresh(); }
+      alert(data.message);
+    } catch(e) { alert('Ошибка: '+e.message); }
+  }
+  function startAutoRefresh() { if(!refreshInterval) refreshInterval=setInterval(loadEmails,5000); }
+  function stopAutoRefresh() { if(refreshInterval){clearInterval(refreshInterval);refreshInterval=null;} }
+  function stopGmailAutoRefresh() { if(gmailRefreshInterval){clearInterval(gmailRefreshInterval);gmailRefreshInterval=null;} }
 
-    /* ---------- Heuristic detection ---------- */
-    function detectPhishing(text = '', from = '') {
-      const reasons = [];
-      let score = 0;
-      const lower = String(text).toLowerCase();
+  // ========== Мониторинг ==========
+  async function loadEmails() {
+    try {
+      const res = await fetch('/api/emails');
+      const data = await res.json();
+      if (data.success) { emailsData = data.emails; renderEmailList(); }
+    } catch {}
+  }
 
-      const urgentWords = ['urgent','срочно','verify','password','login','подтвердите','восстановление','action required'];
-      for (const w of urgentWords) if (lower.includes(w)) { score += 15; reasons.push('Срочный/безопасностный тон'); }
+  function showMonitoring() {
+    document.getElementById('content').innerHTML = `
+      <div class="monitoring-panel">
+        <div class="panel-header">
+          <h2>Мониторинг входящих писем</h2>
+          ${isAdmin()?'<button onclick="toggleMonitoring()" class="btn-toggle">Управление</button>':''}
+        </div>
+        <div class="info-box">${isAdmin()?'<strong>Все письма системы</strong> — вы видите письма всех пользователей':'<strong>Ваши письма</strong> — письма вашего аккаунта'}</div>
+        <div class="stats-row">
+          <div class="stat-card"><div class="stat-number" id="total-emails">0</div><div class="stat-label">Всего писем</div></div>
+          <div class="stat-card danger"><div class="stat-number" id="high-risk">0</div><div class="stat-label">Высокий риск</div></div>
+          <div class="stat-card warning"><div class="stat-number" id="medium-risk">0</div><div class="stat-label">Средний риск</div></div>
+          <div class="stat-card success"><div class="stat-number" id="safe">0</div><div class="stat-label">Безопасные</div></div>
+        </div>
+        <div class="email-list-container">
+          <h3>Проанализированные письма</h3>
+          <div id="email-list"></div>
+        </div>
+      </div>`;
+    loadEmails();
+    if (monitoringActive) startAutoRefresh();
+  }
 
-      const linkRegex = /https?:\/\/[^\s'"]+/ig;
-      const links = (text.match(linkRegex) || []);
-      for (const l of links) {
-        try {
-          const url = new URL(l);
-          if (/^\d+\.\d+\.\d+\.\d+$/.test(url.hostname)) { score += 25; reasons.push('Ссылка указывает на IP-адрес'); }
-          const senderDomain = (from || '').split('@')[1] || '';
-          if (senderDomain && !url.hostname.includes(senderDomain) && !url.hostname.endsWith('google.com')) {
-            score += 20; reasons.push('Домен ссылки не совпадает с доменом отправителя');
-          }
-        } catch (e) {
-          // игнорируем
-          score += 10;
-          reasons.push('Некорректный URL в теле письма');
+  function renderEmailList() {
+    const listDiv = document.getElementById('email-list');
+    if (!listDiv) return;
+    let hi=0,me=0,lo=0,sa=0;
+    emailsData.forEach(e => {
+      if(e.risk_level==='high')hi++;
+      else if(e.risk_level==='medium')me++;
+      else if(e.risk_level==='low')lo++;
+      else sa++;
+    });
+    const upd=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+    upd('total-emails',emailsData.length); upd('high-risk',hi); upd('medium-risk',me); upd('safe',sa+lo);
+    if(!emailsData.length){listDiv.innerHTML='<p class="empty-state">Нет проанализированных писем</p>';return;}
+    listDiv.innerHTML = emailsData.map((em,i)=>{
+      const rc=em.risk_level||'safe', dns=em.dns_check||{};
+      return `<article class="email-item risk-${rc}" onclick="showEmailDetails(${i})">
+        <div class="email-header">
+          <div class="email-meta">
+            <div class="email-subject">${escapeHtml(em.subject)}</div>
+            <div class="email-from">От: ${escapeHtml(em.from)}</div>
+            ${isAdmin()&&em.user_email?`<div class="email-from" style="color:#3282b8;font-size:11px;">👤 ${escapeHtml(em.user_email)}</div>`:''}
+          </div>
+          <div class="email-score"><div class="score-badge ${rc}">${em.score}%</div><div class="verdict">${em.verdict}</div></div>
+        </div>
+        <div class="email-badges">
+          <span class="badge ${dns.spf?'success':'danger'}">SPF: ${dns.spf?'✓':'✗'}</span>
+          <span class="badge ${dns.dkim?'success':'danger'}">DKIM: ${dns.dkim?'✓':'✗'}</span>
+          <span class="badge ${dns.dmarc?'success':'danger'}">DMARC: ${dns.dmarc?'✓':'✗'}</span>
+        </div>
+      </article>`;
+    }).join('');
+  }
+
+  function showEmailDetails(i) {
+    const em=emailsData[i]; if(!em) return;
+    const rc=em.risk_level||'safe', dns=em.dns_check||{};
+    const reasons=em.reasons&&em.reasons.length?`<div class="details-section warning"><h3>Признаки фишинга</h3><ul>${em.reasons.map(r=>`<li>${escapeHtml(r)}</li>`).join('')}</ul></div>`:'';
+    document.getElementById('content').innerHTML = `
+      <div style="margin-bottom:20px;">
+        <button onclick="navigate('monitoring')" class="btn-toggle" style="background:transparent;border:2px solid #1a1a2e;color:#1a1a2e;">← Назад</button>
+        <button onclick="osintFromEmail('${escapeHtml(em.from)}')" class="btn-toggle" style="margin-left:10px;background:#0f4c75;">OSINT по отправителю</button>
+      </div>
+      <div class="osint-details">
+        <div class="panel-header"><h2>📧 Детали письма</h2></div>
+        <div class="osint-risk-card ${rc}"><div class="osint-risk-score">${em.score}%</div><div class="osint-risk-level">${em.verdict}</div></div>
+        <div class="osint-section"><h3>Информация</h3>
+          <p><strong>Тема:</strong> ${escapeHtml(em.subject)}</p>
+          <p><strong>От:</strong> ${escapeHtml(em.from)}</p>
+          <p><strong>Дата:</strong> ${formatDate(em.date)}</p>
+          ${isAdmin()&&em.user_email?`<p><strong>Пользователь:</strong> ${escapeHtml(em.user_email)}</p>`:''}
+        </div>
+        <div class="osint-section"><h3>DNS Проверка</h3>
+          <div class="email-badges">
+            <span class="badge ${dns.spf?'success':'danger'}">SPF: ${dns.spf?'✓ Пройден':'✗ Не пройден'}</span>
+            <span class="badge ${dns.dkim?'success':'danger'}">DKIM: ${dns.dkim?'✓ Пройден':'✗ Не пройден'}</span>
+            <span class="badge ${dns.dmarc?'success':'danger'}">DMARC: ${dns.dmarc?'✓ Пройден':'✗ Не пройден'}</span>
+          </div>
+        </div>
+        ${reasons}
+        ${em.chart_base64?`<div class="osint-section"><h3>Визуальный отчёт</h3><img src="data:image/png;base64,${em.chart_base64}" style="width:100%;border-radius:10px;"/></div>`:''}
+      </div>`;
+  }
+
+  // ========== Gmail ==========
+  function showGmailMonitoring() {
+    document.getElementById('content').innerHTML = `
+      <div class="monitoring-panel">
+        <div class="panel-header">
+          <h2>Gmail Мониторинг</h2>
+          ${isAdmin()?`<div style="display:flex;gap:10px;">
+            <button onclick="startGmailMon()" class="btn-toggle">Запустить</button>
+            <button onclick="stopGmailMon()" class="btn-toggle" style="background:var(--danger);">Остановить</button>
+            <button onclick="loadGmailEmails()" class="btn-toggle" style="background:var(--success);">Обновить</button>
+          </div>`:'<button onclick="loadGmailEmails()" class="btn-toggle">Обновить</button>'}
+        </div>
+        <div id="gmail-status" class="info-box">Нажмите "Обновить"...</div>
+        <div id="gmail-list"></div>
+      </div>`;
+    loadGmailEmails();
+  }
+
+  let gmailEmailsData = [];
+
+  async function loadGmailEmails() {
+    const st=document.getElementById('gmail-status'), li=document.getElementById('gmail-list');
+    if(!st||!li) return;
+    st.innerHTML='<p class="loading">Загрузка...</p>';
+    try {
+      const res=await fetch('/api/received-emails');
+      const data=await res.json();
+      if(data.success){
+        gmailEmailsData = data.emails;
+        st.innerHTML=`<strong>Загружено:</strong> ${data.emails.length} писем`;
+        if(!data.emails.length){li.innerHTML='<p class="empty-state">Нет писем</p>';return;}
+        li.innerHTML=data.emails.map((em,i)=>{
+          const rc=em.risk_level||'safe', dns=em.dns_check||{};
+          return `<article class="email-item risk-${rc}" onclick="showGmailEmailDetails(${i})" style="cursor:pointer;">
+            <div class="email-header">
+              <div class="email-meta">
+                <div class="email-subject">${escapeHtml(em.subject)}</div>
+                <div class="email-from">От: ${escapeHtml(em.from)}</div>
+              </div>
+              <div class="email-score"><div class="score-badge ${rc}">${em.score}%</div><div class="verdict">${em.verdict}</div></div>
+            </div>
+            <div class="email-badges">
+              <span class="badge ${dns.spf?'success':'danger'}">SPF: ${dns.spf?'✓':'✗'}</span>
+              <span class="badge ${dns.dkim?'success':'danger'}">DKIM: ${dns.dkim?'✓':'✗'}</span>
+              <span class="badge ${dns.dmarc?'success':'danger'}">DMARC: ${dns.dmarc?'✓':'✗'}</span>
+              <span onclick="event.stopPropagation();osintFromEmail('${escapeHtml(em.from)}')" style="cursor:pointer;background:#0f4c75;color:white;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:600;">OSINT</span>
+            </div>
+          </article>`;
+        }).join('');
+      } else { st.innerHTML=`<div class="error-msg">❌ ${data.error}</div>`; }
+    } catch(e) { if(st) st.innerHTML=`<div class="error-msg">❌ ${e.message}</div>`; }
+  }
+
+  function showGmailEmailDetails(i) {
+    const em = gmailEmailsData[i]; if (!em) return;
+    const rc = em.risk_level||'safe', dns = em.dns_check||{};
+    const riskColor = rc==='high'?'#dc3545':rc==='medium'?'#ffc107':rc==='low'?'#3282b8':'#28a745';
+    const reasons = em.reasons&&em.reasons.length ? `<div class="details-section warning"><h3>Признаки фишинга</h3><ul>${em.reasons.map(r=>`<li>${escapeHtml(r)}</li>`).join('')}</ul></div>` : '';
+    document.getElementById('content').innerHTML = `
+      <div style="margin-bottom:20px;">
+        <button onclick="navigate('gmail')" class="btn-toggle" style="background:transparent;border:2px solid #1a1a2e;color:#1a1a2e;">← Назад</button>
+        <button onclick="osintFromEmail('${escapeHtml(em.from)}')" class="btn-toggle" style="margin-left:10px;background:#0f4c75;">OSINT по отправителю</button>
+      </div>
+      <div class="osint-details">
+        <div class="panel-header"><h2>Детали письма (Gmail)</h2></div>
+        <div class="osint-risk-card ${rc}"><div class="osint-risk-score">${em.score}%</div><div class="osint-risk-level">${em.verdict}</div></div>
+        <div class="osint-section"><h3>Информация</h3>
+          <p><strong>Тема:</strong> ${escapeHtml(em.subject)}</p>
+          <p><strong>От:</strong> ${escapeHtml(em.from)}</p>
+          <p><strong>Дата:</strong> ${formatDate(em.date)}</p>
+        </div>
+        <div class="osint-section"><h3>DNS Проверка</h3>
+          <div class="email-badges">
+            <span class="badge ${dns.spf?'success':'danger'}">SPF: ${dns.spf?'✓ Пройден':'✗ Не пройден'}</span>
+            <span class="badge ${dns.dkim?'success':'danger'}">DKIM: ${dns.dkim?'✓ Пройден':'✗ Не пройден'}</span>
+            <span class="badge ${dns.dmarc?'success':'danger'}">DMARC: ${dns.dmarc?'✓ Пройден':'✗ Не пройден'}</span>
+          </div>
+        </div>
+        ${reasons}
+        ${em.body_preview ? `<div class="osint-section"><h3>Превью текста</h3><pre style="white-space:pre-wrap;font-size:13px;color:#444;">${escapeHtml(em.body_preview)}</pre></div>` : ''}
+        ${em.visual_chart ? `<div class="osint-section"><h3>Визуальный отчёт</h3><img src="data:image/png;base64,${em.visual_chart}" style="width:100%;border-radius:10px;"/></div>` : ''}
+      </div>`;
+  }
+  async function startGmailMon() {
+    const res=await fetch('/api/gmail-monitoring/start',{method:'POST'});
+    const d=await res.json(); alert(d.message||d.error);
+  }
+  async function stopGmailMon() {
+    const res=await fetch('/api/gmail-monitoring/stop',{method:'POST'});
+    const d=await res.json(); alert(d.message||d.error);
+  }
+
+  // ========== Анализ EML ==========
+  function showManualAnalysis() {
+    document.getElementById('content').innerHTML = `
+      <div class="monitoring-panel">
+        <div class="panel-header"><h2>Анализ EML файлов</h2></div>
+        <div class="info-box">Загрузите .eml файл для ручного анализа на фишинг</div>
+        <div style="margin-top:24px;">
+          <form onsubmit="analyzeEML(event)">
+            <div class="form-group">
+              <label style="font-weight:600;display:block;margin-bottom:8px;">EML файл</label>
+              <input type="file" id="eml-file" accept=".eml" style="width:100%;padding:12px;border:2px solid #dee2e6;border-radius:10px;font-size:14px;" required>
+            </div>
+            <button type="submit" class="btn-toggle" style="margin-top:16px;">Анализировать</button>
+          </form>
+          <div id="eml-result" style="margin-top:24px;"></div>
+        </div>
+      </div>`;
+  }
+  async function analyzeEML(e) {
+    e.preventDefault();
+    const file = document.getElementById('eml-file').files[0];
+    if (!file) return;
+    const r = document.getElementById('eml-result');
+
+    // Шаг 1 — анализ фишинга
+    r.innerHTML = `
+      <div style="background:white;border-radius:14px;padding:24px;margin-bottom:16px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+          <div style="width:32px;height:32px;border:3px solid #1a1a2e;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+          <div>
+            <div style="font-weight:700;font-size:15px;">Шаг 1/2 — Анализ на фишинг...</div>
+            <div style="font-size:12px;color:#888;">Разбираем структуру письма</div>
+          </div>
+        </div>
+      </div>
+      <style>@keyframes spin{to{transform:rotate(360deg)}}</style>`;
+
+    const fd = new FormData();
+    fd.append('file', file);
+
+    let emlData = null;
+    try {
+      const res = await fetch('/upload-eml', { method: 'POST', body: fd });
+      emlData = await res.json();
+    } catch(err) {
+      r.innerHTML = `<div class="error-msg">❌ Ошибка загрузки: ${err.message}</div>`;
+      return;
+    }
+
+    if (!emlData.success) {
+      r.innerHTML = `<div class="error-msg">❌ ${emlData.error}</div>`;
+      return;
+    }
+
+    // Показываем результат фишинга + запускаем OSINT
+    const rc = emlData.risk_level || 'safe';
+    const riskColor = rc==='high'?'#dc3545':rc==='medium'?'#ffc107':rc==='low'?'#3282b8':'#28a745';
+    const dns = emlData.dns_check || {};
+
+    r.innerHTML = `
+      <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+
+      <!-- БЛОК 1: Результат фишинга -->
+      <div style="background:white;border-radius:16px;overflow:hidden;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+        <div style="background:linear-gradient(135deg,#1a1a2e,#0f4c75);padding:20px 24px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="color:rgba(255,255,255,0.7);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Анализ фишинга</div>
+            <div style="color:white;font-size:20px;font-weight:700;margin-top:4px;">📧 ${escapeHtml(emlData.subject||'Без темы')}</div>
+            <div style="color:rgba(255,255,255,0.7);font-size:13px;margin-top:4px;">От: ${escapeHtml(emlData.from||'—')}</div>
+          </div>
+          <div style="text-align:center;background:rgba(255,255,255,0.1);padding:16px 24px;border-radius:12px;">
+            <div style="font-size:42px;font-weight:800;color:${riskColor};">${emlData.score}%</div>
+            <div style="color:white;font-size:13px;font-weight:600;">${emlData.verdict||''}</div>
+          </div>
+        </div>
+
+        <div style="padding:20px 24px;">
+          <!-- DNS статусы -->
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+            <span class="badge ${dns.spf?'success':'danger'}">SPF: ${dns.spf?'✓ Пройден':'✗ Не пройден'}</span>
+            <span class="badge ${dns.dkim?'success':'danger'}">DKIM: ${dns.dkim?'✓ Пройден':'✗ Не пройден'}</span>
+            <span class="badge ${dns.dmarc?'success':'danger'}">DMARC: ${dns.dmarc?'✓ Пройден':'✗ Не пройден'}</span>
+          </div>
+
+          <!-- Признаки фишинга -->
+          ${emlData.reasons && emlData.reasons.length ? `
+          <div style="background:#fff8e1;border:2px solid #ffc107;border-radius:10px;padding:16px;margin-bottom:16px;">
+            <div style="font-weight:700;color:#856404;margin-bottom:10px;">⚠️ Обнаружено ${emlData.reasons.length} признаков фишинга</div>
+            <ul style="margin:0;padding-left:20px;">
+              ${emlData.reasons.slice(0,6).map(reason=>`<li style="font-size:13px;color:#666;margin-bottom:4px;">${escapeHtml(reason)}</li>`).join('')}
+              ${emlData.reasons.length>6?`<li style="font-size:12px;color:#999;">...и ещё ${emlData.reasons.length-6}</li>`:''}
+            </ul>
+          </div>` : `
+          <div style="background:#d4edda;border:2px solid #28a745;border-radius:10px;padding:12px;margin-bottom:16px;">
+            <span style="color:#155724;font-weight:600;">✅ Признаков фишинга не обнаружено</span>
+          </div>`}
+
+          ${emlData.chart_base64 ? `<img src="data:image/png;base64,${emlData.chart_base64}" style="width:100%;border-radius:8px;"/>` : ''}
+        </div>
+      </div>
+
+      <!-- БЛОК 2: OSINT загружается -->
+      <div id="osint-auto-block" style="background:white;border-radius:16px;overflow:hidden;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+        <div style="background:linear-gradient(135deg,#0f4c75,#1a5276);padding:16px 24px;">
+          <div style="color:rgba(255,255,255,0.7);font-size:12px;font-weight:600;text-transform:uppercase;">OSINT расследование отправителя</div>
+          <div style="color:white;font-size:16px;font-weight:700;margin-top:4px;">🔍 ${escapeHtml(emlData.from||'—')}</div>
+        </div>
+        <div style="padding:20px 24px;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="width:28px;height:28px;border:3px solid #0f4c75;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0;"></div>
+            <div style="font-size:14px;color:#666;" id="osint-status-text">Шаг 2/2 — Запускаем OSINT расследование...</div>
+          </div>
+        </div>
+      </div>`;
+
+    // Шаг 2 — OSINT автоматически
+    await autoRunOsint(emlData.from || '', emlData.raw_headers || '');
+  }
+
+  async function autoRunOsint(fromField, rawHeaders) {
+    const block = document.getElementById('osint-auto-block');
+    if (!block) return;
+
+    const updateStatus = (msg) => {
+      const el = document.getElementById('osint-status-text');
+      if (el) el.textContent = msg;
+    };
+
+    try {
+      let osintData = null;
+
+      // Если есть raw заголовки — извлекаем IP на клиенте, затем запрашиваем геолокацию
+      if (rawHeaders && rawHeaders.length > 50) {
+        updateStatus('Извлекаем IP из заголовков письма...');
+        const ipPat = /\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b/g;
+        const privRanges = /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|169\.254\.)/;
+        const allIPs = rawHeaders.match(ipPat) || [];
+        const publicIP = allIPs.find(ip => !privRanges.test(ip));
+        if (publicIP) {
+          updateStatus('Геолокация IP ' + publicIP + '...');
+          const res = await fetch('/api/osint/ip', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ip: publicIP })
+          });
+          osintData = await res.json();
         }
       }
 
-      if (score > 100) score = 100;
-      return { score, reasons: Array.from(new Set(reasons)), links };
-    }
+      // Иначе — по email
+      if (!osintData || !osintData.success) {
+        const emailMatch = fromField.match(/[\w.\-+]+@[\w.\-]+\.\w+/);
+        if (emailMatch) {
+          updateStatus(`Анализируем домен ${emailMatch[0].split('@')[1]}...`);
+          const res = await fetch('/api/osint/email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: emailMatch[0] })
+          });
+          osintData = await res.json();
+        }
+      }
 
-    /* ---------- Render functions ---------- */
-    function renderInbox() {
-      const q = (document.getElementById('search').value || '').toLowerCase();
-      const list = emails
-        .filter(e => (e.from + ' ' + e.subject + ' ' + e.body).toLowerCase().includes(q))
-        .map(e => {
-          const det = detectPhishing(e.body, e.from);
-          const riskClass = det.score > 50 ? 'risk-high' : (det.score > 20 ? 'risk-medium' : 'risk-low');
-          return `
-            <article class="email-item ${riskClass}" onclick="openEmail(${e.id})" aria-labelledby="sub-${e.id}">
-              <div class="email-meta">
-                <div class="avatar">${(e.from && e.from[0]) ? e.from[0].toUpperCase() : '?'}</div>
-                <div>
-                  <div id="sub-${e.id}" class="email-subject">${escapeHtml(e.subject)}</div>
-                  <div class="email-from">${escapeHtml(e.from)} • ${escapeHtml(e.date)}</div>
-                </div>
-              </div>
-              <div class="email-risk">Risk: ${det.score}%</div>
-            </article>
-          `;
-        }).join('');
-      document.getElementById('content').innerHTML = `<h2>Входящие</h2><div class="inbox-list">${list || '<p>Пусто</p>'}</div>`;
+      if (osintData && osintData.success) {
+        renderOsintInBlock(block, osintData, fromField);
+      } else {
+        block.querySelector('div:last-child').innerHTML = `<p style="color:#888;font-size:14px;">OSINT недоступен: не удалось определить отправителя</p>`;
+      }
+    } catch(err) {
+      if (block) block.querySelector('[style*="padding:20px"]').innerHTML =
+        `<p style="color:#dc3545;font-size:14px;">OSINT ошибка: ${err.message}</p>`;
     }
+  }
 
-    function openEmail(id) {
-      currentEmailId = id;
-      const mail = emails.find(x => x.id === id);
-      if (!mail) { document.getElementById('content').innerHTML = '<p>Письмо не найдено</p>'; return; }
-      const det = detectPhishing(mail.body, mail.from);
-      document.getElementById('content').innerHTML = `
-        <article class="mail-view">
-          <header>
-            <h2>${escapeHtml(mail.subject)}</h2>
-            <div class="mail-from"><strong>От:</strong> ${escapeHtml(mail.from)} <span class="dot">•</span> ${escapeHtml(mail.date)}</div>
-          </header>
-          <section class="mail-body">${mail.body}</section>
-          <footer class="mail-actions">
-            <div class="detected ${det.score > 50 ? 'danger' : (det.score > 20 ? 'warn' : 'ok')}">
-              <strong>Phishing score:</strong> ${det.score}% ${det.reasons.length ? ' — ' + det.reasons.join('; ') : ''}
-            </div>
-            <div class="buttons">
-              <button onclick="renderInbox()">Назад</button>
-              <button onclick="markPhishing(${id})" class="danger">Report phishing</button>
-            </div>
-          </footer>
-        </article>
-      `;
-      attachLinkHandlers();
-    }
+  function renderOsintInBlock(block, data, fromLabel) {
+    const geo = data.geo || {};
+    const domain_info = data.domain || {};
+    const device = data.device || {};
+    const blacklists = data.blacklists || {};
+    const risk = data.risk_score || 0;
+    const rc = risk >= 70 ? 'high' : risk >= 40 ? 'medium' : 'low';
+    const riskColor = rc==='high'?'#dc3545':rc==='medium'?'#ffc107':'#28a745';
 
-    function showCompose() {
-      document.getElementById('content').innerHTML = `
-        <h2>Новое письмо</h2>
-        <form id="composeForm" onsubmit="sendCompose(event)">
-          <label>Кому</label><input type="email" id="composeTo" required placeholder="example@domain.com">
-          <label>Тема</label><input id="composeSubject" required>
-          <label>Сообщение</label><textarea id="composeBody" rows="8" placeholder="Текст письма..."></textarea>
-          <div class="compose-actions">
-            <button type="submit">Отправить </button>
-            <button type="button" onclick="renderInbox()">Отмена</button>
-          </div>
-        </form>
-      `;
-    }
+    const blEntries = Object.entries(blacklists);
+    const listedBl = blEntries.filter(([,v])=>v).map(([n])=>n);
+    const cleanBl = blEntries.filter(([,v])=>!v).map(([n])=>n);
 
-    function showSettings() {
-      document.getElementById('content').innerHTML = `
-        <h2>Настройки безопасности</h2>
-        <div class="settings">
-          <label><input type="checkbox" id="optAutoDetect" checked> Включить автоматическую проверку ссылок</label>
-          <p class="small">В реальной системе здесь подключаются SPF/DKIM/DMARC, URL sandboxes и ML-классификаторы.</p>
+    block.innerHTML = `
+      <div style="background:linear-gradient(135deg,#0f4c75,#1a5276);padding:16px 24px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="color:rgba(255,255,255,0.7);font-size:12px;font-weight:600;text-transform:uppercase;">OSINT расследование отправителя</div>
+          <div style="color:white;font-size:15px;font-weight:700;margin-top:4px;">🔍 ${escapeHtml(fromLabel||'—')}</div>
         </div>
-      `;
-    }
+        <div style="text-align:center;background:rgba(255,255,255,0.12);padding:12px 20px;border-radius:12px;">
+          <div style="font-size:32px;font-weight:800;color:${riskColor};">${risk}%</div>
+          <div style="color:rgba(255,255,255,0.8);font-size:12px;">угроза</div>
+        </div>
+      </div>
 
-    /* ---------- Helpers & link handling ---------- */
-    function escapeHtml(str) {
-      if (!str) return '';
-      return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-    }
+      <div style="padding:20px 24px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
 
-    function attachLinkHandlers() {
-      const mailBody = document.querySelector('.mail-body');
-      if (!mailBody) return;
-      const links = mailBody.querySelectorAll('a[href]');
-      links.forEach(a => {
-        a.setAttribute('data-href', a.href);
-        try {
-          const url = new URL(a.href);
-          a.setAttribute('title', 'Домен: ' + url.hostname);
-        } catch(e) { a.setAttribute('title', a.href); }
+          <!-- Геолокация -->
+          <div style="background:#f8f9fa;border-radius:12px;padding:16px;border:2px solid #e9ecef;">
+            <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">Геолокация IP</div>
+            ${geo.ip ? `
+              <div style="font-size:22px;font-weight:700;color:#1a1a2e;margin-bottom:8px;">${geo.country_flag||''} ${escapeHtml(geo.city||'?')}, ${escapeHtml(geo.country||'?')}</div>
+              <div style="font-size:12px;color:#666;line-height:1.8;">
+                <div><strong>IP:</strong> ${escapeHtml(geo.ip)}</div>
+                <div><strong>Провайдер:</strong> ${escapeHtml(geo.isp||'—')}</div>
+                <div><strong>Часовой пояс:</strong> ${escapeHtml(geo.timezone||'—')}</div>
+                <div><strong>VPN/Proxy:</strong> <span style="color:${geo.is_vpn?'#dc3545':'#28a745'};font-weight:600;">${geo.is_vpn?'Обнаружен':'Нет'}</span></div>
+              </div>` :
+              '<div style="color:#888;font-size:13px;">IP не удалось определить</div>'}
+          </div>
 
-        a.addEventListener('click', function(ev) {
-          ev.preventDefault();
-          const href = this.getAttribute('data-href');
-          const mail = emails.find(x => x.id === currentEmailId) || {};
-          const det = detectPhishing(mail.body, mail.from);
-          let linkSuspicious = false;
-          try {
-            const url = new URL(href);
-            const senderDomain = (mail.from || '').split('@')[1] || '';
-            if (/^\d+\.\d+\.\d+\.\d+$/.test(url.hostname)) linkSuspicious = true;
-            if (senderDomain && !url.hostname.includes(senderDomain)) linkSuspicious = true;
-          } catch (e) { linkSuspicious = true; }
+          <!-- Устройство -->
+          <div style="background:#f8f9fa;border-radius:12px;padding:16px;border:2px solid #e9ecef;">
+            <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">💻 Устройство</div>
+            ${device.detected ? `
+              <div style="font-size:36px;text-align:center;margin-bottom:8px;">${device.is_mobile?'📱':'🖥️'}</div>
+              <div style="font-size:12px;color:#666;line-height:1.8;text-align:center;">
+                <div style="font-size:15px;font-weight:700;color:#1a1a2e;">${device.is_mobile?'Мобильный':'Компьютер'}</div>
+                ${device.os?`<div>💿 <strong>ОС:</strong> ${escapeHtml(device.os)}</div>`:''}
+                ${device.mailer?`<div><strong>Клиент:</strong> ${escapeHtml(device.mailer)}</div>`:''}
+                ${device.language?`<div><strong>Язык:</strong> ${escapeHtml(device.language)}</div>`:''}
+              </div>` :
+              '<div style="color:#888;font-size:13px;text-align:center;padding-top:8px;">Данные в заголовках письма не найдены.<br>Загрузи .eml файл с полными заголовками.</div>'}
+          </div>
 
-          if (det.score > 30 || linkSuspicious) {
-            const text = linkSuspicious ? 'Ссылка кажется подозрительной (домен не совпадает или это IP).' : 'Письмо имеет высокий phishing score.';
-            document.getElementById('linkWarningText').innerText = text + '\\nСсылка: ' + href;
-            document.getElementById('continueLink').setAttribute('href', href);
-            document.getElementById('linkWarning').style.display = 'flex';
-            document.getElementById('linkWarning').setAttribute('aria-hidden', 'false');
-          } else {
-            window.open(href, '_blank', 'noopener');
-          }
-        });
+          <!-- Домен -->
+          <div style="background:#f8f9fa;border-radius:12px;padding:16px;border:2px solid #e9ecef;">
+            <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">Домен отправителя</div>
+            ${domain_info.domain ? `
+              <div style="font-size:16px;font-weight:700;color:#1a1a2e;margin-bottom:10px;">${escapeHtml(domain_info.domain)}</div>
+              <div style="font-size:12px;color:#666;line-height:1.9;">
+                <div><strong>Создан:</strong> <span style="color:${domain_info.is_new?'#dc3545':'inherit'};font-weight:${domain_info.is_new?700:400};">${escapeHtml(domain_info.created||'—')}${domain_info.is_new?' ⚠️ НОВЫЙ':''}</span></div>
+                <div><strong>Истекает:</strong> ${escapeHtml(domain_info.expires||'—')}</div>
+                <div><strong>Регистратор:</strong> ${escapeHtml(domain_info.registrar||'—')}</div>
+                <div><strong>Страна:</strong> ${escapeHtml(domain_info.country||'—')}</div>
+                <div><strong>SPF:</strong> <span style="color:${domain_info.spf?'#28a745':'#dc3545'};font-weight:600;">${domain_info.spf?'✅ Есть':'❌ Нет'}</span></div>
+                <div><strong>DMARC:</strong> <span style="color:${domain_info.dmarc?'#28a745':'#dc3545'};font-weight:600;">${domain_info.dmarc?'✅ Есть':'❌ Нет'}</span></div>
+              </div>` :
+              '<div style="color:#888;font-size:13px;">Домен не определён</div>'}
+          </div>
+
+          <!-- Репутация -->
+          <div style="background:#f8f9fa;border-radius:12px;padding:16px;border:2px solid #e9ecef;">
+            <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">Репутация (Blacklists)</div>
+            ${listedBl.length ? `
+              <div style="margin-bottom:10px;">
+                <div style="font-size:13px;font-weight:700;color:#dc3545;margin-bottom:6px;">В чёрных списках (${listedBl.length}):</div>
+                ${listedBl.map(n=>`<span style="display:inline-block;background:#f8d7da;color:#721c24;padding:3px 10px;border-radius:8px;font-size:12px;font-weight:600;margin:2px;">${escapeHtml(n)}</span>`).join('')}
+              </div>` : ''}
+            ${cleanBl.length ? `
+              <div>
+                <div style="font-size:12px;font-weight:600;color:#28a745;margin-bottom:6px;">✅ Чисто в базах (${cleanBl.length}):</div>
+                ${cleanBl.map(n=>`<span style="display:inline-block;background:#d4edda;color:#155724;padding:3px 8px;border-radius:6px;font-size:11px;margin:2px;">${escapeHtml(n)}</span>`).join('')}
+              </div>` : ''}
+            ${!blEntries.length ? '<div style="color:#888;font-size:13px;">Проверка blacklist недоступна</div>' : ''}
+          </div>
+
+        </div>
+
+        <!-- Итоговый вывод -->
+        ${data.summary ? `
+        <div style="margin-top:16px;padding:16px;background:${risk>=70?'#f8d7da':risk>=40?'#fff3cd':'#d4edda'};border-radius:10px;border-left:4px solid ${riskColor};">
+          <div style="font-size:13px;font-weight:700;margin-bottom:4px;">📝 Итог расследования</div>
+          <div style="font-size:14px;">${escapeHtml(data.summary)}</div>
+        </div>` : ''}
+      </div>`;
+  }
+
+  // ========== URL проверка ==========
+  function showURLCheck() {
+    document.getElementById('content').innerHTML = `
+      <div class="monitoring-panel">
+        <div class="panel-header"><h2>Проверка URL на фишинг</h2></div>
+        <form onsubmit="checkURL(event)">
+          <div class="form-group">
+            <label style="font-weight:600;display:block;margin-bottom:8px;">URL адрес</label>
+            <input type="url" id="url-input" placeholder="https://example.com" style="width:100%;padding:14px;border:2px solid #dee2e6;border-radius:10px;font-size:15px;" required>
+          </div>
+          <button type="submit" class="btn-toggle" style="margin-top:16px;">🔍 Проверить</button>
+        </form>
+        <div id="url-result" style="margin-top:24px;"></div>
+      </div>`;
+  }
+  async function checkURL(e) {
+    e.preventDefault();
+    const url=document.getElementById('url-input').value;
+    const r=document.getElementById('url-result');
+    r.innerHTML='<p class="loading">Проверка...</p>';
+    try {
+      const res=await fetch('/api/check-url',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
+      const data=await res.json();
+      if(data.success){
+        const rc=data.risk_level;
+        r.innerHTML=`<div class="osint-details">
+          <div class="osint-risk-card ${rc}"><div class="osint-risk-score">${data.score}%</div><div class="osint-risk-level">${data.verdict}</div></div>
+          ${data.reasons.length?`<div class="osint-section warning"><h3>⚠️ Признаки</h3><ul>${data.reasons.map(rx=>`<li>${escapeHtml(rx)}</li>`).join('')}</ul></div>`:'<div class="osint-section"><p>✅ Подозрительных признаков не обнаружено</p></div>'}
+        </div>`;
+      } else { r.innerHTML=`<div class="error-msg">❌ ${data.error}</div>`; }
+    } catch(e) { r.innerHTML=`<div class="error-msg">❌ ${e.message}</div>`; }
+  }
+
+  // ========== DNS ==========
+  function showDNSCheck() {
+    document.getElementById('content').innerHTML = `
+      <div class="dns-panel">
+        <h2>Проверка защиты доменов</h2>
+        <div class="tabs">
+          <button onclick="showDNSTab('spf')" class="tab-btn active" id="dns-tab-spf">SPF</button>
+          <button onclick="showDNSTab('dkim')" class="tab-btn" id="dns-tab-dkim">DKIM</button>
+          <button onclick="showDNSTab('dmarc')" class="tab-btn" id="dns-tab-dmarc">DMARC</button>
+        </div>
+        <div id="dns-tab-content"></div>
+      </div>`;
+    showDNSTab('spf');
+  }
+  function showDNSTab(tab) {
+    document.querySelectorAll('.dns-panel .tab-btn').forEach(b=>b.classList.remove('active'));
+    const el=document.getElementById('dns-tab-'+tab); if(el) el.classList.add('active');
+    const c=document.getElementById('dns-tab-content');
+    if(tab==='spf') c.innerHTML=`<div class="info-box">SPF — список разрешённых серверов</div><form onsubmit="checkSPF(event)"><label>Домен</label><input id="spf_domain" value="gmail.com" required><button type="submit">Проверить</button></form><div id="spf-result"></div>`;
+    else if(tab==='dkim') c.innerHTML=`<div class="info-box">DKIM — криптографическая подпись</div><form onsubmit="checkDKIM(event)"><label>Домен</label><input id="dkim_domain" value="gmail.com" required><label>Селектор</label><input id="dkim_selector" value="google" required><button type="submit">Проверить</button></form><div id="dkim-result"></div>`;
+    else c.innerHTML=`<div class="info-box">DMARC — политика обработки писем</div><form onsubmit="checkDMARC(event)"><label>Домен</label><input id="dmarc_domain" value="gmail.com" required><button type="submit">Проверить</button></form><div id="dmarc-result"></div>`;
+  }
+  async function checkSPF(e){e.preventDefault();const domain=document.getElementById('spf_domain').value,r=document.getElementById('spf-result');r.innerHTML='<p class="loading">Проверка...</p>';try{const res=await fetch('/check-spf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain})});const d=await res.json();r.innerHTML=d.success&&d.has_spf?`<div class="dns-result success"><h4>✅ SPF найден</h4><pre>${escapeHtml(d.records.join('\n'))}</pre></div>`:`<div class="dns-result fail"><h4>❌ SPF не найден</h4></div>`;}catch(err){r.innerHTML=`<p class="error">❌ ${err.message}</p>`;}}
+  async function checkDKIM(e){e.preventDefault();const domain=document.getElementById('dkim_domain').value,selector=document.getElementById('dkim_selector').value,r=document.getElementById('dkim-result');r.innerHTML='<p class="loading">Проверка...</p>';try{const res=await fetch('/check-dkim',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain,selector})});const d=await res.json();r.innerHTML=d.success&&d.has_dkim?`<div class="dns-result success"><h4>✅ DKIM найден</h4><pre>${escapeHtml(d.records.join('\n'))}</pre></div>`:`<div class="dns-result fail"><h4>❌ ${escapeHtml(d.message||'Не найден')}</h4></div>`;}catch(err){r.innerHTML=`<p class="error">❌ ${err.message}</p>`;}}
+  async function checkDMARC(e){e.preventDefault();const domain=document.getElementById('dmarc_domain').value,r=document.getElementById('dmarc-result');r.innerHTML='<p class="loading">Проверка...</p>';try{const res=await fetch('/check-dmarc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain})});const d=await res.json();r.innerHTML=d.success&&d.has_dmarc?`<div class="dns-result success"><h4>✅ DMARC найден</h4><p>Политика: ${escapeHtml(d.policy)}</p><pre>${escapeHtml(d.records.join('\n'))}</pre></div>`:`<div class="dns-result fail"><h4>❌ DMARC не найден</h4></div>`;}catch(err){r.innerHTML=`<p class="error">❌ ${err.message}</p>`;}}
+  
+  /* ========== OSINT ========== */
+  function showOSINT() {
+    stopAutoRefresh();
+    stopGmailAutoRefresh();
+
+    document.getElementById('content').innerHTML = `
+      <div style="width:100%;">
+        <h2 style="margin:0 0 6px;font-size:22px;display:flex;align-items:center;gap:10px;"></h2>
+        <div style="background:white;border-left:4px solid #3282b8;border-radius:8px;padding:14px 18px;margin-bottom:24px;font-size:14px;color:#444;">
+          Вставьте <strong>email адрес</strong>, <strong>IP адрес</strong> или <strong>заголовки письма</strong> чтобы узнать: геолокацию, устройство, репутацию и информацию об отправителе
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
+
+          <!-- Email блок -->
+          <div style="background:white;border-radius:14px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,0.07);">
+            <div style="font-size:15px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
+              По email адресу
+            </div>
+            <input type="text" id="osint-email-input" placeholder="attacker@example.com"
+              style="width:100%;padding:12px 14px;border:2px solid #dee2e6;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none;"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();runOsintByEmail();}">
+            <button onclick="runOsintByEmail()"
+              style="margin-top:12px;width:100%;padding:13px;background:linear-gradient(135deg,#1a1a2e,#0f4c75);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px;">
+              Анализировать
+            </button>
+          </div>
+
+          <!-- IP блок -->
+          <div style="background:white;border-radius:14px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,0.07);">
+            <div style="font-size:15px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
+              По IP адресу
+            </div>
+            <input type="text" id="osint-ip-input" placeholder="185.220.101.1"
+              style="width:100%;padding:12px 14px;border:2px solid #dee2e6;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none;"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();runOsintByIP();}">
+            <button onclick="runOsintByIP()"
+              style="margin-top:12px;width:100%;padding:13px;background:linear-gradient(135deg,#1a1a2e,#0f4c75);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px;">
+              Геолокация
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Заголовки блок -->
+        <div style="background:white;border-radius:14px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,0.07);margin-bottom:20px;">
+          <div style="font-size:15px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px;">
+            Заголовки письма (Received: строки)
+          </div>
+          <div style="font-size:12px;color:#888;margin-bottom:12px;">
+            Gmail: Открой письмо → ⋮ (три точки) → Показать оригинал → скопируй всё содержимое
+          </div>
+          <textarea id="osint-headers-input" rows="5"
+            placeholder="Received: from mail.evil.com ([185.220.101.1]) by smtp.gmail.com...&#10;X-Mailer: The Bat! 9.3&#10;X-Originating-IP: 185.220.101.1"
+            style="width:100%;padding:12px 14px;border:2px solid #dee2e6;border-radius:8px;font-size:13px;font-family:monospace;resize:vertical;box-sizing:border-box;outline:none;"></textarea>
+          <button onclick="runOsintByHeaders()"
+            style="margin-top:12px;padding:13px 32px;background:linear-gradient(135deg,#1a1a2e,#0f4c75);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:14px;display:flex;align-items:center;gap:8px;">
+            Разобрать заголовки
+          </button>
+        </div>
+
+        <!-- Результат -->
+        <div id="osint-result"></div>
+      </div>
+    `;
+  }
+
+  async function runOsintByEmail(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const email = document.getElementById('osint-email-input').value.trim();
+    if (!email) return;
+  
+    const r = document.getElementById('osint-result');
+    r.innerHTML = '<p class="loading" style="text-align: center; padding: 40px; color: var(--text-color); font-size: 18px;">Анализируем...</p>';
+  
+    try {
+      const res = await fetch('/api/osint/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
       });
-    }
+      const data = await res.json();
+          
+      if (data.success) {
+        const riskClass = data.risk_level;
+        const riskColor = riskClass === 'high' ? '#e94560' : riskClass === 'medium' ? '#ff9800' : '#4CAF50';
+                      
+        let geoHtml = '';
+        if (data.geolocation && data.geolocation.success) {
+          geoHtml = `
+            <div style="margin-top: 25px; background: var(--card-bg); padding: 20px; border-radius: 10px; border-left: 4px solid #4CAF50;">
+              <h4 style="margin-bottom: 15px; color: var(--text-color);">Геолокация сервера</h4>
+              <div style="line-height: 1.8; color: var(--text-color);">
+                <strong>IP:</strong> ${escapeHtml(data.geolocation.ip || 'Н/Д')}<br>
+                <strong>Страна:</strong> ${escapeHtml(data.geolocation.country || 'Н/Д')} (${data.geolocation.country_code || 'Н/Д'})<br>
+                <strong>Регион:</strong> ${escapeHtml(data.geolocation.region || 'Н/Д')}<br>
+                <strong>Город:</strong> ${escapeHtml(data.geolocation.city || 'Н/Д')}<br>
+                <strong>Провайдер:</strong> ${escapeHtml(data.geolocation.isp || 'Н/Д')}<br>
+                <strong>Организация:</strong> ${escapeHtml(data.geolocation.org || 'Н/Д')}<br>
+                <strong>Часовой пояс:</strong> ${escapeHtml(data.geolocation.timezone || 'Н/Д')}
+              </div>
+            </div>
+          `;
+        }
+              
+        let domainHtml = '';
+        if (data.domain_info && data.domain_info.resolved) {
+          const di = data.domain_info;
+          domainHtml = `
+            <div style="margin-top: 25px; background: var(--card-bg); padding: 20px; border-radius: 10px; border-left: 4px solid #2196F3;">
+              <h4 style="margin-bottom: 15px; color: var(--text-color);">Информация о домене</h4>
+              <div style="line-height: 1.8; color: var(--text-color);">
+                <strong>Домен:</strong> ${escapeHtml(di.domain)}<br>
+                <strong>IP адрес:</strong> ${escapeHtml(di.ip_address)}<br>
+                <strong>MX записи:</strong> ${di.mx_records && di.mx_records.length > 0 ? di.mx_records.join(', ') : 'Не найдено'}<br>
+                <strong>NS записи:</strong> ${di.ns_records && di.ns_records.length > 0 ? di.ns_records.map(n => escapeHtml(n)).join(', ') : 'Не найдено'}
+              </div>
+            </div>
+          `;
+        }
+      
+        r.innerHTML = `
+          <div style="border: 3px solid ${riskColor}; border-radius: 15px; padding: 30px; background: var(--card-bg); animation: fadeIn 0.5s;">
+            <div style="text-align: center; margin-bottom: 25px;">
+              <h3 style="color: ${riskColor}; font-size: 28px; margin-bottom: 10px;">Результаты анализа</h3>
+              <div style="font-size: 48px; font-weight: bold; color: ${riskColor};">${data.risk_score}%</div>
+              <div style="font-size: 18px; color: ${riskColor}; margin-top: 10px;">
+                ${riskClass === 'high' ? 'Высокий риск' : riskClass === 'medium' ? 'Средний риск' : 'Низкий риск'}
+              </div>
+            </div>
 
-    function closeWarning() {
-      document.getElementById('linkWarning').style.display = 'none';
-      document.getElementById('linkWarning').setAttribute('aria-hidden', 'true');
-    }
+            <div style="background: var(--input-bg); padding: 20px; border-radius: 10px; margin-bottom: 25px;">
+              <strong style="color: var(--text-color);">Email / Домен:</strong> 
+              <span style="color: var(--text-color);">${escapeHtml(data.email || data.domain)}</span>
+            </div>
 
-    function markPhishing(id) {
-      alert('Письмо отмечено как фишинг. В дипломной работе: отправка в SOC/логирование).');
-      renderInbox();
-    }
+            <div style="margin-top: 25px;">
+              <h4 style="margin-bottom: 15px; color: var(--text-color);">DNS защита</h4>
+              <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                <span class="badge ${data.dns_check.spf ? 'success' : 'danger'}" style="padding: 10px 20px; font-size: 16px;">
+                  SPF: ${data.dns_check.spf ? 'Активен' : 'Отсутствует'}
+                </span>
+                <span class="badge ${data.dns_check.dkim ? 'success' : 'danger'}" style="padding: 10px 20px; font-size: 16px;">
+                  DKIM: ${data.dns_check.dkim ? 'Активен' : 'Отсутствует'}
+                </span>
+                <span class="badge ${data.dns_check.dmarc ? 'success' : 'danger'}" style="padding: 10px 20px; font-size: 16px;">
+                  DMARC: ${data.dns_check.dmarc ? 'Активен' : 'Отсутствует'}
+                </span>
+              </div>
+            </div>
 
+            ${domainHtml}
+            ${geoHtml}
+          </div>
+
+          <style>
+            @keyframes fadeIn {
+              from { opacity: 0; transform: translateY(20px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+          </style>
+        `;
+      } else {
+        r.innerHTML = `<div style="background: rgba(255,69,58,0.1); border: 2px solid #ff453a; color: #ff453a; padding: 20px; border-radius: 10px; text-align: center;">
+          ${escapeHtml(data.error || 'Ошибка анализа')}
+        </div>`;
+      }
+    } catch (e) {
+      r.innerHTML = `<div style="background: rgba(255,69,58,0.1); border: 2px solid #ff453a; color: #ff453a; padding: 20px; border-radius: 10px; text-align: center;">
+        Ошибка подключения: ${escapeHtml(e.message)}
+      </div>`;
+    }
+  }
+
+  async function runOsintByIP(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const ip = document.getElementById('osint-ip-input').value.trim();
+    if (!ip) return;
+  
+    const r = document.getElementById('osint-result');
+    r.innerHTML = '<p class="loading" style="text-align: center; padding: 40px; color: var(--text-color); font-size: 18px;">Определяем геолокацию...</p>';
+  
+    try {
+      const res = await fetch('/api/osint/ip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip })
+      });
+      const data = await res.json();
     
-function sendCompose(ev) {
-  ev.preventDefault();
-  const to = document.getElementById('composeTo').value;
-  const subj = document.getElementById('composeSubject').value;
-  const body = document.getElementById('composeBody').value;
+      if (data.success) {
+        const riskClass = data.risk_level;
+        const riskColor = riskClass === 'high' ? '#e94560' : riskClass === 'medium' ? '#ff9800' : '#4CAF50';
+      
+        let geoHtml = '';
+        if (data.geolocation && data.geolocation.success) {
+          geoHtml = `
+            <div style="margin-top: 25px; background: var(--card-bg); padding: 25px; border-radius: 10px; border-left: 4px solid #4CAF50;">
+              <h4 style="margin-bottom: 20px; color: var(--text-color); font-size: 20px;">Геолокация</h4>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; line-height: 2; color: var(--text-color); font-size: 15px;">
+                <div><strong>Страна:</strong> ${escapeHtml(data.geolocation.country || 'Н/Д')} (${data.geolocation.country_code || ''})</div>
+                <div><strong>Город:</strong> ${escapeHtml(data.geolocation.city || 'Н/Д')}</div>
+                <div><strong>Регион:</strong> ${escapeHtml(data.geolocation.region || 'Н/Д')}</div>
+                <div><strong>Индекс:</strong> ${escapeHtml(data.geolocation.zip || 'Н/Д')}</div>
+                <div><strong>Часовой пояс:</strong> ${escapeHtml(data.geolocation.timezone || 'Н/Д')}</div>
+                <div><strong>Провайдер:</strong> ${escapeHtml(data.geolocation.isp || 'Н/Д')}</div>
+                <div style="grid-column: 1 / -1;"><strong>Организация:</strong> ${escapeHtml(data.geolocation.org || 'Н/Д')}</div>
+                ${data.geolocation.latitude && data.geolocation.longitude ? `
+                  <div style="grid-column: 1 / -1;"><strong>Координаты:</strong> ${data.geolocation.latitude}, ${data.geolocation.longitude}</div>
+                ` : ''}
+              </div>
+            </div>
+          `;
+        }
+      
+        let repHtml = '';
+        if (data.reputation) {
+          repHtml = `
+            <div style="margin-top: 25px; background: var(--card-bg); padding: 25px; border-radius: 10px; border-left: 4px solid ${data.reputation.risk === 'Высокий' ? '#e94560' : '#ff9800'};">
+              <h4 style="margin-bottom: 20px; color: var(--text-color); font-size: 20px;">Репутация</h4>
+              <div style="line-height: 2; color: var(--text-color); font-size: 15px;">
+                <div><strong>Тип:</strong> ${escapeHtml(data.reputation.type || 'Н/Д')}</div>
+                <div><strong>Уровень риска:</strong> <span style="color: ${riskColor};">${escapeHtml(data.reputation.risk || 'Н/Д')}</span></div>
+                <div><strong>Примечание:</strong> ${escapeHtml(data.reputation.note || 'Нет данных')}</div>
+              </div>
+            </div>
+          `;
+        }
+      
+        r.innerHTML = `
+          <div style="border: 3px solid ${riskColor}; border-radius: 15px; padding: 30px; background: var(--card-bg); animation: fadeIn 0.5s;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h3 style="color: ${riskColor}; font-size: 28px; margin-bottom: 15px;">Результаты анализа IP</h3>
+              <div style="font-size: 52px; font-weight: bold; color: ${riskColor};">${data.risk_score}%</div>
+              <div style="font-size: 20px; color: ${riskColor}; margin-top: 15px;">
+                ${riskClass === 'high' ? 'Высокий риск' : riskClass === 'medium' ? 'Средний риск' : 'Низкий риск'}
+              </div>
+            </div>
 
-  fetch('/send', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      to: to,
-      subject: subj,
-      message: body
-    })
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data.status === 'success') {
-      alert('✅ ' + data.message);
-    } else {
-      alert('❌ Ошибка: ' + data.message);
+            <div style="background: var(--input-bg); padding: 20px; border-radius: 10px; margin-bottom: 25px; text-align: center;">
+              <strong style="color: var(--text-color); font-size: 18px;">IP адрес:</strong> 
+              <span style="color: var(--text-color); font-size: 24px; font-family: monospace;">${escapeHtml(data.ip)}</span>
+            </div>
+
+            ${geoHtml}
+            ${repHtml}
+          </div>
+        `;
+      } else {
+        r.innerHTML = `<div style="background: rgba(255,69,58,0.1); border: 2px solid #ff453a; color: #ff453a; padding: 20px; border-radius: 10px; text-align: center; font-size: 16px;">
+          ❌ ${escapeHtml(data.error || 'Ошибка анализа')}
+        </div>`;
+      }
+    } catch (e) {
+      r.innerHTML = `<div style="background: rgba(255,69,58,0.1); border: 2px solid #ff453a; color: #ff453a; padding: 20px; border-radius: 10px; text-align: center; font-size: 16px;">
+        ❌ Ошибка подключения: ${escapeHtml(e.message)}
+      </div>`;
     }
-  })
-  .catch(err => alert('⚠️ Ошибка при подключении к серверу: ' + err));
-}
+  }
+
+  // Быстрый OSINT прямо из письма
+  function osintFromEmail(fromField) {
+    navigate('osint');
+    setTimeout(() => {
+      const emailMatch = fromField.match(/[\w.\-+]+@[\w.\-]+\.\w+/);
+      if (emailMatch) {
+        document.getElementById('osint-email-input').value = emailMatch[0];
+        runOsintByEmail();
+      }
+    }, 100);
+  }
 
 
+  async function runOsintByHeaders(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const headersText = document.getElementById('osint-headers-input').value.trim();
+    if (!headersText) return;
+    const r = document.getElementById('osint-result');
+    r.innerHTML = '<p class="loading" style="text-align:center;padding:40px;font-size:18px;">Разбираем заголовки письма...</p>';
 
-    /* ---------- Init ---------- */
-    document.addEventListener('DOMContentLoaded', () => {
-      renderInbox();
-    });
-  </script>
+    const ipPattern = /\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b/g;
+    const privateRanges = /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|169\.254\.)/;
+
+    const lines = headersText.split('\n');
+    const parsedHeaders = {};
+    let currentKey = '';
+    for (const line of lines) {
+      const match = line.match(/^([\w\-]+):\s*(.*)$/);
+      if (match) { currentKey = match[1]; parsedHeaders[currentKey] = (parsedHeaders[currentKey] ? parsedHeaders[currentKey] + '\n' : '') + match[2]; }
+      else if (currentKey && line.match(/^\s+/)) { parsedHeaders[currentKey] += ' ' + line.trim(); }
+    }
+
+    let foundIP = null;
+    const xOrigIP = parsedHeaders['X-Originating-IP'] || parsedHeaders['x-originating-ip'] || '';
+    if (xOrigIP) { const ips = xOrigIP.match(ipPattern); if (ips) foundIP = ips.find(ip => !privateRanges.test(ip)) || null; }
+    if (!foundIP) {
+      const receivedHeaders = Object.entries(parsedHeaders).filter(([k]) => k.toLowerCase() === 'received').map(([,v]) => v);
+      for (const h of receivedHeaders) { const ips = h.match(ipPattern); if (ips) { foundIP = ips.find(ip => !privateRanges.test(ip)); if (foundIP) break; } }
+    }
+    if (!foundIP) { const allIPs = headersText.match(ipPattern) || []; foundIP = allIPs.find(ip => !privateRanges.test(ip)) || null; }
+
+    const fromHeader = parsedHeaders['From'] || parsedHeaders['from'] || '';
+    const dateHeader = parsedHeaders['Date'] || parsedHeaders['date'] || '';
+    const subjectHeader = parsedHeaders['Subject'] || parsedHeaders['subject'] || '';
+    const userAgentHeader = parsedHeaders['User-Agent'] || parsedHeaders['X-Mailer'] || parsedHeaders['x-mailer'] || '';
+
+    let metaHtml = `
+      <div style="background:white;border-radius:14px;padding:20px;margin-bottom:16px;border-left:4px solid #3282b8;">
+        <h4 style="margin:0 0 14px;color:#1a1a2e;">Извлечённые данные</h4>
+        ${subjectHeader ? `<div class="osint-row"><span class="osint-label">Тема</span><span class="osint-value">${escapeHtml(subjectHeader)}</span></div>` : ''}
+        ${fromHeader ? `<div class="osint-row"><span class="osint-label">От</span><span class="osint-value">${escapeHtml(fromHeader)}</span></div>` : ''}
+        ${dateHeader ? `<div class="osint-row"><span class="osint-label">Дата</span><span class="osint-value">${escapeHtml(dateHeader)}</span></div>` : ''}
+        ${userAgentHeader ? `<div class="osint-row"><span class="osint-label">Клиент</span><span class="osint-value">${escapeHtml(userAgentHeader)}</span></div>` : ''}
+        <div class="osint-row"><span class="osint-label">IP отправителя</span><span class="osint-value ${foundIP ? 'danger' : ''}">${foundIP ? foundIP : 'Не найден'}</span></div>
+      </div>`;
+
+    if (!foundIP) {
+      r.innerHTML = metaHtml + `<div style="background:#fff3cd;border:2px solid #ffc107;color:#856404;padding:16px;border-radius:10px;">
+        Публичный IP не найден. Убедитесь что вставлены полные заголовки включая строки <strong>Received:</strong>
+      </div>`;
+      return;
+    }
+
+    r.innerHTML = metaHtml + `<p style="text-align:center;padding:20px;">Геолокация IP ${escapeHtml(foundIP)}...</p>`;
+
+    try {
+      const res = await fetch('/api/osint/ip', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ip:foundIP}) });
+      const data = await res.json();
+      if (data.success) {
+        const rc = data.risk_level;
+        const riskColor = rc==='high'?'#dc3545':rc==='medium'?'#ffc107':'#28a745';
+        const geo = data.geolocation||{}, rep = data.reputation||{};
+        r.innerHTML = metaHtml + `
+          <div style="border:3px solid ${riskColor};border-radius:14px;padding:24px;background:white;">
+            <div style="text-align:center;margin-bottom:20px;">
+              <div style="font-size:42px;font-weight:800;color:${riskColor};">${data.risk_score}%</div>
+              <div style="font-size:16px;color:${riskColor};font-weight:600;">${rc==='high'?'Высокий риск':rc==='medium'?'Средний риск':'Низкий риск'}</div>
+            </div>
+            <div class="osint-grid">
+              <div class="osint-card">
+                <h4>Геолокация IP ${escapeHtml(foundIP)}</h4>
+                ${geo.success?`
+                <div class="osint-row"><span class="osint-label">Страна</span><span class="osint-value">${escapeHtml(geo.country||'—')}</span></div>
+                <div class="osint-row"><span class="osint-label">Город</span><span class="osint-value">${escapeHtml(geo.city||'—')}</span></div>
+                <div class="osint-row"><span class="osint-label">Регион</span><span class="osint-value">${escapeHtml(geo.region||'—')}</span></div>
+                <div class="osint-row"><span class="osint-label">Провайдер</span><span class="osint-value">${escapeHtml(geo.isp||'—')}</span></div>
+                <div class="osint-row"><span class="osint-label">Организация</span><span class="osint-value">${escapeHtml(geo.org||'—')}</span></div>
+                <div class="osint-row"><span class="osint-label">Часовой пояс</span><span class="osint-value">${escapeHtml(geo.timezone||'—')}</span></div>
+                ${geo.latitude?`<div class="osint-row"><span class="osint-label">Координаты</span><span class="osint-value">${geo.latitude}, ${geo.longitude}</span></div>`:''}
+                `:'<p style="color:#888;">Геолокация недоступна</p>'}
+              </div>
+              <div class="osint-card">
+                <h4>Репутация</h4>
+                <div class="osint-row"><span class="osint-label">Тип</span><span class="osint-value">${escapeHtml(rep.type||'—')}</span></div>
+                <div class="osint-row"><span class="osint-label">Уровень риска</span><span class="osint-value" style="color:${riskColor}">${escapeHtml(rep.risk||'—')}</span></div>
+                <div class="osint-row"><span class="osint-label">Примечание</span><span class="osint-value">${escapeHtml(rep.note||'—')}</span></div>
+              </div>
+            </div>
+          </div>`;
+      } else {
+        r.innerHTML = metaHtml + `<div style="background:rgba(255,69,58,0.1);border:2px solid #ff453a;color:#ff453a;padding:16px;border-radius:10px;">${escapeHtml(data.error||'Ошибка')}</div>`;
+      }
+    } catch(err) {
+      r.innerHTML = metaHtml + `<div style="background:rgba(255,69,58,0.1);border:2px solid #ff453a;color:#ff453a;padding:16px;border-radius:10px;">Ошибка: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  function renderOsintResult(data) {
+    const r = document.getElementById('osint-result');
+    const geo = data.geo || {};
+    const domain_info = data.domain || {};
+    const device = data.device || {};
+    const blacklists = data.blacklists || {};
+    const risk = data.risk_score || 0;
+    const rc = risk >= 70 ? 'high' : risk >= 40 ? 'medium' : 'low';
+    const riskColor = rc === 'high' ? '#dc3545' : rc === 'medium' ? '#ffc107' : '#28a745';
+
+    const blHtml = Object.entries(blacklists).map(([name, listed]) =>
+      `<span class="blacklist-item ${listed?'listed':'clean'}">${listed?'[!]':'[ok]'} ${escapeHtml(name)}</span>`
+    ).join('') || '<span style="color:#888;font-size:13px;">Нет данных</span>';
+
+    r.innerHTML = `
+      <div style="background:white;border-radius:16px;padding:24px;margin-bottom:16px;border-top:4px solid ${riskColor};">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+          <h3 style="margin:0;font-size:20px;">Результат расследования</h3>
+          <div style="text-align:center;">
+            <div style="font-size:36px;font-weight:700;color:${riskColor};">${risk}%</div>
+            <div style="font-size:12px;color:#666;">Уровень угрозы</div>
+            <div class="risk-meter"><div class="risk-meter-fill" style="width:${risk}%;background:${riskColor};"></div></div>
+          </div>
+        </div>
+
+        <div class="osint-grid">
+
+          <!-- Геолокация -->
+          <div class="osint-card">
+            <h4>Геолокация IP</h4>
+            ${geo.ip ? `
+            <div class="osint-row"><span class="osint-label">IP адрес</span><span class="osint-value">${escapeHtml(geo.ip)}</span></div>
+            <div class="osint-row"><span class="osint-label">Страна</span><span class="osint-value">${escapeHtml(geo.country_flag||'')} ${escapeHtml(geo.country||'Неизвестно')}</span></div>
+            <div class="osint-row"><span class="osint-label">Город</span><span class="osint-value">${escapeHtml(geo.city||'Неизвестно')}</span></div>
+            <div class="osint-row"><span class="osint-label">Регион</span><span class="osint-value">${escapeHtml(geo.region||'—')}</span></div>
+            <div class="osint-row"><span class="osint-label">Провайдер (ISP)</span><span class="osint-value">${escapeHtml(geo.isp||'—')}</span></div>
+            <div class="osint-row"><span class="osint-label">Организация</span><span class="osint-value">${escapeHtml(geo.org||'—')}</span></div>
+            <div class="osint-row"><span class="osint-label">Часовой пояс</span><span class="osint-value">${escapeHtml(geo.timezone||'—')}</span></div>
+            <div class="osint-row"><span class="osint-label">VPN/Proxy/Tor</span><span class="osint-value ${geo.is_vpn?'danger':'success'}">${geo.is_vpn?'Возможно':'Нет'}</span></div>
+            ` : '<p style="color:#888;font-size:13px;">IP не определён</p>'}
+          </div>
+
+          <!-- Устройство -->
+          <div class="osint-card">
+            <h4>Устройство отправителя</h4>
+            ${device.detected ? `
+            <div style="text-align:center;font-size:40px;margin-bottom:12px;">${device.is_mobile?'[M]':'[PC]'}</div>
+            <div class="osint-row"><span class="osint-label">Тип</span><span class="osint-value">${device.is_mobile?'Мобильный телефон':'Персональный компьютер'}</span></div>
+            <div class="osint-row"><span class="osint-label">Почтовый клиент</span><span class="osint-value">${escapeHtml(device.mailer||'Неизвестно')}</span></div>
+            <div class="osint-row"><span class="osint-label">ОС</span><span class="osint-value">${escapeHtml(device.os||'Неизвестно')}</span></div>
+            <div class="osint-row"><span class="osint-label">Язык</span><span class="osint-value">${escapeHtml(device.language||'—')}</span></div>
+            ` : '<p style="color:#888;font-size:13px;">Данные об устройстве недоступны (нет заголовков письма)</p>'}
+          </div>
+
+          <!-- Информация о домене -->
+          <div class="osint-card">
+            <h4>Домен отправителя</h4>
+            ${domain_info.domain ? `
+            <div class="osint-row"><span class="osint-label">Домен</span><span class="osint-value">${escapeHtml(domain_info.domain)}</span></div>
+            <div class="osint-row"><span class="osint-label">Регистратор</span><span class="osint-value">${escapeHtml(domain_info.registrar||'Неизвестно')}</span></div>
+            <div class="osint-row"><span class="osint-label">Дата регистрации</span><span class="osint-value ${domain_info.is_new?'danger':''}">${escapeHtml(domain_info.created||'—')} ${domain_info.is_new?'(Новый)':''}</span></div>
+            <div class="osint-row"><span class="osint-label">Срок действия</span><span class="osint-value">${escapeHtml(domain_info.expires||'—')}</span></div>
+            <div class="osint-row"><span class="osint-label">Страна регистрации</span><span class="osint-value">${escapeHtml(domain_info.country||'—')}</span></div>
+            <div class="osint-row"><span class="osint-label">SPF</span><span class="osint-value ${domain_info.spf?'success':'danger'}">${domain_info.spf?'Настроен':'Отсутствует'}</span></div>
+            <div class="osint-row"><span class="osint-label">DMARC</span><span class="osint-value ${domain_info.dmarc?'success':'danger'}">${domain_info.dmarc?'Настроен':'Отсутствует'}</span></div>
+            ` : '<p style="color:#888;font-size:13px;">Домен не определён</p>'}
+          </div>
+
+          <!-- Репутация / Blacklists -->
+          <div class="osint-card">
+            <h4>Репутация в базах</h4>
+            <div style="margin-bottom:12px;">${blHtml}</div>
+            ${data.threat_intel ? `
+            <div class="osint-row"><span class="osint-label">AbuseIPDB</span><span class="osint-value ${data.threat_intel.abuse_score>50?'danger':'success'}">${data.threat_intel.abuse_score||0}% злоупотреблений</span></div>
+            <div class="osint-row"><span class="osint-label">Сообщений об атаках</span><span class="osint-value">${data.threat_intel.total_reports||0}</span></div>
+            ` : ''}
+            ${data.email_info ? `
+            <div style="margin-top:12px;padding-top:12px;border-top:1px solid #f0f0f0;">
+              <div class="osint-row"><span class="osint-label">Email в утечках</span><span class="osint-value ${data.email_info.breached?'danger':'success'}">${data.email_info.breached?'Найден в утечках':'Не найден'}</span></div>
+              ${data.email_info.breach_count?`<div class="osint-row"><span class="osint-label">Кол-во утечек</span><span class="osint-value danger">${data.email_info.breach_count}</span></div>`:''}
+            </div>` : ''}
+          </div>
+
+        </div>
+
+        ${data.summary ? `<div style="margin-top:16px;padding:16px;background:#f8f9fa;border-radius:10px;border-left:4px solid ${riskColor};">
+          <h4 style="margin:0 0 8px;font-size:14px;">Вывод</h4>
+          <p style="margin:0;font-size:14px;">${escapeHtml(data.summary)}</p>
+        </div>` : ''}
+      </div>`;
+  }
+
+  // ========== Отправка ==========
+  function showSendEmail() {
+    document.getElementById('content').innerHTML = `
+      <div class="monitoring-panel">
+        <div class="panel-header"><h2>Отправка через Gmail</h2></div>
+        <div class="info-box">Отправка тестовых писем через Gmail аккаунт системы</div>
+        <div style="background:white;padding:24px;border-radius:14px;margin-top:20px;">
+          <form onsubmit="sendGmail(event)">
+            <div class="form-group" style="margin-bottom:18px;">
+              <label style="font-weight:600;display:block;margin-bottom:8px;">Кому (email)</label>
+              <input type="email" id="gmail_to" required placeholder="recipient@example.com"
+                style="width:100%;padding:13px;border:2px solid #dee2e6;border-radius:10px;font-size:15px;box-sizing:border-box;">
+            </div>
+            <div class="form-group" style="margin-bottom:18px;">
+              <label style="font-weight:600;display:block;margin-bottom:8px;">Тема</label>
+              <input type="text" id="gmail_subject" required placeholder="Тема письма"
+                style="width:100%;padding:13px;border:2px solid #dee2e6;border-radius:10px;font-size:15px;box-sizing:border-box;">
+            </div>
+            <div class="form-group" style="margin-bottom:18px;">
+              <label style="font-weight:600;display:block;margin-bottom:8px;">Текст письма</label>
+              <textarea id="gmail_body" rows="6" placeholder="Текст письма..."
+                style="width:100%;padding:13px;border:2px solid #dee2e6;border-radius:10px;font-size:15px;box-sizing:border-box;resize:vertical;"></textarea>
+            </div>
+            <button type="submit" class="btn-toggle" style="width:100%;padding:15px;font-size:16px;">Отправить через Gmail</button>
+          </form>
+        </div>
+        ${isAdmin()?`
+        <div style="background:white;padding:24px;border-radius:14px;margin-top:16px;border:2px solid #ffc107;">
+          <h3 style="margin:0 0 8px;color:#856404;">Тест фишинга (только для администратора)</h3>
+          <p style="font-size:13px;color:#666;margin:0 0 16px;">Отправка тестового фишингового письма для проверки осведомлённости</p>
+          <form onsubmit="sendPhishing(event)" style="display:flex;gap:12px;align-items:flex-end;">
+            <div style="flex:1;">
+              <label style="font-weight:600;display:block;margin-bottom:8px;font-size:13px;">Email цели</label>
+              <input type="email" id="phishing_to" required placeholder="target@company.com"
+                style="width:100%;padding:11px;border:2px solid #ffc107;border-radius:8px;font-size:14px;box-sizing:border-box;">
+            </div>
+            <button type="submit" class="btn-toggle" style="background:#856404;white-space:nowrap;">Отправить тест</button>
+          </form>
+        </div>` : ''}
+      </div>`;
+  }
+
+  async function sendGmail(e) {
+    e.preventDefault();
+    const data={to_email:document.getElementById('gmail_to').value,subject:document.getElementById('gmail_subject').value,body:document.getElementById('gmail_body').value};
+    try {
+      const res=await fetch('/send-gmail',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+      const result=await res.json();
+      alert(result.success?'✅ '+result.message:'❌ '+result.error);
+      if(result.success){e.target.reset();}
+    } catch(err){alert('❌ Ошибка: '+err.message);}
+  }
+  async function sendPhishing(e) {
+    e.preventDefault();
+    if(!isAdmin()) return;
+    const data={to_email:document.getElementById('phishing_to').value};
+    try {
+      const res=await fetch('/send-phishing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+      const result=await res.json();
+      alert(result.success?'⚠️ '+result.message:'❌ '+result.error);
+    } catch(err){alert('❌ Ошибка: '+err.message);}
+  }
+
+  // ========== Панель пользователей (только admin) ==========
+  async function showUsersPanel() {
+    if(!isAdmin()) return;
+    document.getElementById('content').innerHTML = `
+      <div class="users-panel">
+        <div class="panel-header">
+          <h2>Управление пользователями</h2>
+          <button onclick="showCreateUserForm()" class="btn-toggle">+ Добавить</button>
+        </div>
+        <div id="create-user-form" style="display:none;background:white;padding:24px;border-radius:14px;margin-bottom:24px;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <h3 style="margin:0 0 20px;">Новый пользователь</h3>
+          <form onsubmit="createUser(event)">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+              <div><label style="font-weight:600;font-size:13px;">Имя</label><input id="new-name" type="text" required placeholder="Имя" style="width:100%;padding:10px;border:2px solid #dee2e6;border-radius:8px;margin-top:6px;box-sizing:border-box;"></div>
+              <div><label style="font-weight:600;font-size:13px;">Email</label><input id="new-email" type="email" required placeholder="email@example.com" style="width:100%;padding:10px;border:2px solid #dee2e6;border-radius:8px;margin-top:6px;box-sizing:border-box;"></div>
+              <div><label style="font-weight:600;font-size:13px;">Пароль</label><input id="new-password" type="password" required minlength="6" placeholder="Мин. 6 символов" style="width:100%;padding:10px;border:2px solid #dee2e6;border-radius:8px;margin-top:6px;box-sizing:border-box;"></div>
+              <div><label style="font-weight:600;font-size:13px;">Роль</label><select id="new-role" style="width:100%;padding:10px;border:2px solid #dee2e6;border-radius:8px;margin-top:6px;"><option value="user">Пользователь</option><option value="admin">Администратор</option></select></div>
+            </div>
+            <div style="margin-top:16px;display:flex;gap:12px;">
+              <button type="submit" class="btn-toggle">Создать</button>
+              <button type="button" onclick="document.getElementById('create-user-form').style.display='none'" class="btn-toggle" style="background:transparent;border:2px solid #dee2e6;color:#1a1a2e;">Отмена</button>
+            </div>
+          </form>
+        </div>
+        <div id="users-table">Загрузка...</div>
+      </div>`;
+    loadUsers();
+  }
+  function showCreateUserForm(){const f=document.getElementById('create-user-form');f.style.display=f.style.display==='none'?'block':'none';}
+  async function loadUsers(){
+    const td=document.getElementById('users-table');if(!td)return;
+    try{
+      const res=await fetch('/api/admin/users');const data=await res.json();
+      if(data.success){
+        td.innerHTML=`<table><thead><tr><th>Имя</th><th>Email</th><th>Роль</th><th>Дата</th><th>Действия</th></tr></thead><tbody>
+          ${data.users.map(u=>`<tr>
+            <td>${escapeHtml(u.name)}</td>
+            <td>${escapeHtml(u.email)}</td>
+            <td><span class="role-badge ${u.role}">${u.role==='admin'?'Администратор':'Пользователь'}</span></td>
+            <td>${formatDate(u.created_at)}</td>
+            <td>${u.email!==currentUser.email?`<button onclick="deleteUser('${escapeHtml(u.email)}')" style="background:var(--danger);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;">Удалить</button>`:'<span style="color:#aaa;font-size:12px;">— (вы)</span>'}</td>
+          </tr>`).join('')}
+        </tbody></table>`;
+      }
+    }catch(e){td.innerHTML=`<p>Ошибка: ${e.message}</p>`;}
+  }
+  async function createUser(e){
+    e.preventDefault();
+    const body={name:document.getElementById('new-name').value,email:document.getElementById('new-email').value,password:document.getElementById('new-password').value,role:document.getElementById('new-role').value};
+    try{
+      const res=await fetch('/api/admin/users/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      const data=await res.json();
+      if(data.success){document.getElementById('create-user-form').style.display='none';e.target.reset();loadUsers();alert('✅ Пользователь создан!');}
+      else alert('❌ '+data.error);
+    }catch(e){alert('Ошибка: '+e.message);}
+  }
+  async function deleteUser(email){
+    if(!confirm(`Удалить пользователя ${email}?`)) return;
+    try{
+      const res=await fetch('/api/admin/users/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
+      const data=await res.json();
+      if(data.success){loadUsers();alert('✅ Удалён');}else alert('❌ '+data.error);
+    }catch(e){alert('Ошибка: '+e.message);}
+  }
+
+  // ========== Выход ==========
+  async function handleLogout(){
+    if(!confirm('Выйти?')) return;
+    try{await fetch('/api/auth/logout',{method:'POST'});window.location.href='/login';}catch{alert('Ошибка выхода');}
+  }
+
+  // ========== Инициализация ==========
+  document.addEventListener('DOMContentLoaded', async () => {
+    await loadCurrentUser();
+    await updateMonitoringStatus();
+    setInterval(updateMonitoringStatus, 10000);
+    showMonitoring();
+  });
+</script>
 </body>
 </html>
-
